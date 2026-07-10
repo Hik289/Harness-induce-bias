@@ -166,9 +166,8 @@ def run_kstep_rollout(
         llm_err: Optional[str] = None
         stats_dump: dict = {}
         try:
-            # Per-step seed = base seed + step idx, makes the 3-seed Phase 1
-            # design produce distinct call streams (Azure 不强制 determinism
-            # but it changes the request body so prompt-cache hashes vary)
+            # Per-step seed = base seed + step idx. Some providers may not enforce
+            # determinism, but this still makes the three-seed design explicit.
             step_seed = (seed * 1000 + step) if seed is not None else None
             belief_obj, stats = llm.chat_json(prompt, max_tokens=1200, seed=step_seed)
             stats_dump = asdict(stats)

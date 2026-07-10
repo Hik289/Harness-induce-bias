@@ -4,11 +4,6 @@
   <a href="https://arxiv.org/abs/2607.04528"><img src="https://img.shields.io/badge/arXiv-2607.04528-b31b1b.svg" alt="arXiv"></a>
   <a href="https://arxiv.org/pdf/2607.04528"><img src="https://img.shields.io/badge/Paper-PDF-blue.svg" alt="Paper PDF"></a>
   <a href="https://github.com/Hik289/Harness-induce-bias"><img src="https://img.shields.io/badge/GitHub-Code-black.svg" alt="GitHub code"></a>
-  <a href="#quick-start"><img src="https://img.shields.io/badge/quickstart-smoke%20test-2ea44f" alt="Quickstart"></a>
-  <a href="#intuition"><img src="https://img.shields.io/badge/intuition-figure-7c3aed" alt="Intuition figure"></a>
-  <a href="#reproducing-results"><img src="https://img.shields.io/badge/reproduce-results-2563eb" alt="Reproduce results"></a>
-  <a href="#metric-d_belief"><img src="https://img.shields.io/badge/metric-D__belief-f97316" alt="D_belief metric"></a>
-  <a href="#citation"><img src="https://img.shields.io/badge/citation-BibTeX-64748b" alt="Citation"></a>
 </p>
 
 <p align="center">
@@ -75,19 +70,12 @@ If you keep a different folder name, expose a `skeleton` package alias from the 
 
 ## Configuration
 
-Set credentials via environment variables. Do not hardcode API keys in source files or experiment logs.
+Set credentials via environment variables. The client uses any OpenAI-compatible chat-completions endpoint. Do not hardcode API keys in source files or experiment logs.
 
 ```bash
-export AZURE_OPENAI_API_KEY="your-key-here"
-export AZURE_OPENAI_ENDPOINT="https://your-resource.services.ai.azure.com/openai/v1"
-export AZURE_OPENAI_DEPLOYMENT="gpt-5.4-mini"
-```
-
-Standard OpenAI-compatible endpoints can also be used through the same client path:
-
-```bash
-export AZURE_OPENAI_ENDPOINT="https://api.openai.com/v1"
-export AZURE_OPENAI_API_KEY="sk-..."
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+export OPENAI_API_KEY="<your-api-key>"
+export OPENAI_MODEL="gpt-5.4-mini"
 ```
 
 ## Quick Start

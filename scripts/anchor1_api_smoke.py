@@ -1,4 +1,4 @@
-"""anchor_1: Azure GPT-5.4-mini 50 次调用成功率 ≥ 95%.
+"""anchor_1: OpenAI-compatible API 50 次调用成功率 >= 95%.
 
 每次调用要求模型返回一个 {n: int, parity: "odd"|"even"} 的合法 JSON, 用于同
 时验证 (a) 链路可用 (b) JSON mode 稳定 (c) rate limit 不被触发。

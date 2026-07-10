@@ -1,16 +1,11 @@
-"""Azure GPT-5.4-mini API wrapper.
+"""OpenAI-compatible chat-completions API wrapper.
 
 设计原则:
-- API key 通过环境变量 AZURE_OPENAI_API_KEY 注入 (绝不写到 agent 配置或日志)
+- API key 通过环境变量 OPENAI_API_KEY 注入 (绝不写到 agent 配置或日志)
 - 提供 retry + exponential backoff (per readme §Risks 段)
 - 提供 strict-JSON 输出模式: 调用方传 schema, client 负责重试 + 校验
 - 计费/调用元数据 (latency, tokens, cost) 由 client 写回, 上游统一记录
 - rate limit: 默认 sleep 0.3s between calls (低于 spec 的 1 req/s 上限)
-
-readme.md §0 给的 DefaultAzureCredential 路径要求 hpc 上有 Azure CLI / managed
-identity, 实际环境无此条件; 经实测, 把 idea.md 中给出的 API key 作为 OpenAI
-client 的 api_key (走 Azure 部署的 OpenAI v1 endpoint) 可直接通; 本项目固定走
-此路径。
 """
 from __future__ import annotations
 
@@ -24,9 +19,9 @@ from typing import Any, Optional
 from openai import OpenAI, APIError, APIConnectionError, RateLimitError
 
 
-# Endpoint 是 deployment 全局共享的常量, 没有敏感性, 可写代码里
-AZURE_ENDPOINT = "https://YOUR_AZURE_ENDPOINT/openai/v1"
-DEFAULT_DEPLOYMENT = "gpt-5.4-mini"
+# Defaults are provider-agnostic and can be overridden with environment variables.
+DEFAULT_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_MODEL = "gpt-5.4-mini"
 
 
 @dataclass
@@ -47,19 +42,28 @@ class LLMClient:
 
     def __init__(
         self,
-        deployment: str = DEFAULT_DEPLOYMENT,
+        deployment: Optional[str] = None,
         api_key: Optional[str] = None,
-        endpoint: str = AZURE_ENDPOINT,
+        endpoint: Optional[str] = None,
         min_interval_s: float = 0.3,
         max_retries: int = 4,
     ) -> None:
-        key = api_key or os.environ.get("AZURE_OPENAI_API_KEY")
+        key = api_key or os.environ.get("OPENAI_API_KEY")
         if not key:
             raise RuntimeError(
-                "AZURE_OPENAI_API_KEY 未设置; 请通过环境变量注入 (不要硬编码到 agent 配置)"
+                "OPENAI_API_KEY 未设置; 请通过环境变量注入 (不要硬编码到 agent 配置)"
             )
-        self._client = OpenAI(base_url=endpoint, api_key=key)
-        self._deployment = deployment
+        base_url = (
+            endpoint
+            or os.environ.get("OPENAI_BASE_URL")
+            or DEFAULT_BASE_URL
+        )
+        self._client = OpenAI(base_url=base_url.rstrip("/"), api_key=key)
+        self._deployment = (
+            deployment
+            or os.environ.get("OPENAI_MODEL")
+            or DEFAULT_MODEL
+        )
         self._min_interval = min_interval_s
         self._max_retries = max_retries
         self._last_call_ts: float = 0.0
@@ -86,11 +90,9 @@ class LLMClient:
     ) -> tuple[str, CallStats]:
         """返回 (content, stats). 自动 retry + backoff.
 
-        `seed`: 通过 chat.completions `seed` 参数传给 API. 实测 (DAY3 Step A 启动前
-        sanity) Azure gpt-5.4-mini 接受 seed 参数但 system_fingerprint=None 且实际
-        不强制 determinism. 仍然传, 因为: (a) Azure 后续可能启用 (b) Phase 1 主表
-        需要 3 个 seed 估方差, seed 的不同值至少给了 prompt-cache miss/hit 的随机
-        分支变化.
+        `seed`: 通过 chat.completions `seed` 参数传给 API. Some providers/models may
+        not enforce determinism, but the seed still changes the request body and keeps
+        Phase 1's three-seed design explicit.
         """
         stats = CallStats()
         last_err: Optional[Exception] = None

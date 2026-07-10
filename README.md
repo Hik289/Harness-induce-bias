@@ -1,6 +1,9 @@
-# Harness-Induced Belief Bias in LLM Software Agents
+# Measuring Harness-Induced Belief Divergence in Multi-Step LLM Agents
 
 <p align="center">
+  <a href="https://arxiv.org/abs/2607.04528"><img src="https://img.shields.io/badge/arXiv-2607.04528-b31b1b.svg" alt="arXiv"></a>
+  <a href="https://arxiv.org/pdf/2607.04528"><img src="https://img.shields.io/badge/Paper-PDF-blue.svg" alt="Paper PDF"></a>
+  <a href="https://github.com/Hik289/Harness-induce-bias"><img src="https://img.shields.io/badge/GitHub-Code-black.svg" alt="GitHub code"></a>
   <a href="#quick-start"><img src="https://img.shields.io/badge/quickstart-smoke%20test-2ea44f" alt="Quickstart"></a>
   <a href="#intuition"><img src="https://img.shields.io/badge/intuition-figure-7c3aed" alt="Intuition figure"></a>
   <a href="#reproducing-results"><img src="https://img.shields.io/badge/reproduce-results-2563eb" alt="Reproduce results"></a>
@@ -12,13 +15,12 @@
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
   <img src="https://img.shields.io/badge/benchmarks-HIBench%20%7C%20Terminal--Bench%20%7C%20SWE--bench-lightgrey" alt="Benchmarks">
-  <img src="https://img.shields.io/badge/paper-2026-lightgrey" alt="Paper 2026">
 </p>
 
 Code release for the paper:
 
-> **Harness-Induced Belief Bias: How Agent Execution Interfaces Shape LLM World-Model Trajectories**  
-> Anonymous Authors, 2026
+> **Measuring Harness-Induced Belief Divergence in Multi-Step LLM Agents**<br>
+> Haiwen Yi and Xinyuan Song, 2026
 
 This repository studies how the execution harness around a fixed LLM changes the model's belief trajectory. The same task and same base model can produce different risk estimates, failure modes, and action preferences when the harness changes what the model observes, blocks, repairs, verifies, or logs.
 
@@ -153,12 +155,14 @@ Full specification: [analysis/METRICS_SPEC.md](analysis/METRICS_SPEC.md)
 ## Citation
 
 ```bibtex
-@article{anonymous2026harnessbias,
-  title={Harness-Induced Belief Bias: How Agent Execution Interfaces
-         Shape {LLM} World-Model Trajectories},
-  author={Anonymous Authors},
-  journal={arXiv preprint},
-  year={2026}
+@misc{yi2026measuringharnessinducedbeliefdivergence,
+  title         = {Measuring Harness-Induced Belief Divergence in Multi-Step LLM Agents},
+  author        = {Haiwen Yi and Xinyuan Song},
+  year          = {2026},
+  eprint        = {2607.04528},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI},
+  url           = {https://arxiv.org/abs/2607.04528}
 }
 ```
 

@@ -2,15 +2,10 @@
 
 <p align="center">
   <a href="https://arxiv.org/abs/2607.04528"><img src="https://img.shields.io/badge/arXiv-2607.04528-b31b1b.svg" alt="arXiv"></a>
-  <a href="https://arxiv.org/pdf/2607.04528"><img src="https://img.shields.io/badge/Paper-PDF-blue.svg" alt="Paper PDF"></a>
-  <a href="https://github.com/Hik289/Harness-induce-bias"><img src="https://img.shields.io/badge/GitHub-Code-black.svg" alt="GitHub code"></a>
-</p>
-
-<p align="center">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
-  <img src="https://img.shields.io/badge/benchmarks-HIBench%20%7C%20Terminal--Bench%20%7C%20SWE--bench-lightgrey" alt="Benchmarks">
 </p>
+
 
 Code release for the paper:
 

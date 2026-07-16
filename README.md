@@ -14,7 +14,13 @@ Code release for the paper:
 
 This repository studies how the execution harness around a fixed LLM changes the model's belief trajectory. The same task and same base model can produce different risk estimates, failure modes, and action preferences when the harness changes what the model observes, blocks, repairs, verifies, or logs.
 
-## Intuition
+## At a Glance
+
+- **Research question.** How much can the execution harness around a fixed LLM change its belief trajectory and downstream actions?
+- **Core idea.** HIBench varies observations, blocking, repair, verification, and logging while holding the base task and model fixed.
+- **What is included.** Harness variants, belief-divergence metrics, benchmark adapters, long-horizon studies, and plotting scripts.
+
+## Motivation
 
 <p align="center">
   <img src="figures/intuition.png" width="900" alt="Same task and same LLM, different harness, different belief">
@@ -24,7 +30,7 @@ The core phenomenon is simple: **same task + same LLM -> different harness -> di
 
 Source figure: [figures/intuition.pdf](figures/intuition.pdf)
 
-## Highlights
+## Key Contributions
 
 - Six harness variants, from raw execution to structured, risk-gated, repair-heavy, verification-selective, and cost-aware interfaces.
 - Belief-state logging with a canonical JSON schema for progress, risk, recoverability, failure mode, constraints, and next action.
@@ -32,7 +38,7 @@ Source figure: [figures/intuition.pdf](figures/intuition.pdf)
 - Phase 1 experiments over HIBench-Code toy tasks and horizons `K={1,3,5,8}`.
 - Supplementary adapters for Terminal-Bench and SWE-bench Verified style evaluations.
 
-## Repository Layout
+## Repository Structure
 
 ```text
 .

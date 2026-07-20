@@ -141,6 +141,10 @@ Full specification: [analysis/METRICS_SPEC.md](analysis/METRICS_SPEC.md)
 | `D_num` | 0.20 | Normalized L1 distance on numeric predictions |
 | `D_act` | 0.10 | Next-action recommendation mismatch |
 
+## Reviewer Guide
+
+For a reviewer-oriented map of smoke checks, paper-scale entry points, data boundaries, and reporting metadata, see [Artifact Guide](docs/ARTIFACT.md).
+
 ## Artifact Checklist
 
 - **Code release.** Core implementations, configuration files, and reproduction entry points are versioned in this repository.

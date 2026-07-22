@@ -1,8 +1,8 @@
 # Artifact Guide
 
-This guide maps the public `Harness-induce-bias` repository to a reviewer-friendly artifact workflow for `Measuring Harness-Induced Belief Divergence in Multi-Step LLM Agents`. It is meant to make the release easier to inspect in the style of ICML, ICLR, NeurIPS, and similar artifact-review processes.
+Operational notes for reproducing `Measuring Harness-Induced Belief Divergence in Multi-Step LLM Agents` from the public `Harness-induce-bias` repository.
 
-## What To Inspect First
+## Review Path
 
 - `benchmark/`: Project-specific implementation subtree.
 - `biwm/`: Project-specific implementation subtree.
@@ -17,9 +17,9 @@ This guide maps the public `Harness-induce-bias` repository to a reviewer-friend
 
 - `requirements.txt`: Primary Python dependency list.
 
-## Minimal Verification
+## Smoke Checks
 
-Run these checks in a fresh environment before launching expensive jobs:
+Run these checks before long jobs:
 
 ```bash
 python -m compileall -q .
@@ -31,9 +31,9 @@ python scripts/sanity_6harness_K5.py
 python tests/test_smoke.py
 ```
 
-## Reproduction And Analysis Entry Points
+## Reproduction Entry Points
 
-These are the main tracked files to inspect for paper-scale or benchmark-scale reproduction. Some require arguments, credentials, downloaded benchmarks, or local data paths described in the README.
+Main tracked entry points for paper-scale or benchmark-scale runs:
 
 - `python analysis/biwm_v2_recompute.py`
 - `python analysis/phase1_table1.py`
@@ -44,14 +44,14 @@ These are the main tracked files to inspect for paper-scale or benchmark-scale r
 - `figures/intuition.pdf`
 - `figures/intuition.png`
 
-## Data, Credentials, And Generated Outputs
+## Data And Outputs
 
 - API-backed runs should read credentials from environment variables or local `.env` files only; never commit real keys or provider-specific secrets.
 - Record provider endpoint, model/deployment name, sampling parameters, and execution date for every API-backed table or figure.
 - Treat generated JSONL files, logs, caches, model checkpoints, and benchmark downloads as local artifacts unless explicitly tracked as fixtures.
 - For stochastic experiments, record seeds, task counts, dataset splits, and the exact git commit used for the run.
 
-## Reviewer Reporting Checklist
+## Reporting Checklist
 
 - `git rev-parse HEAD`
 - Python version and dependency-install command

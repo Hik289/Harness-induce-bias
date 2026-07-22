@@ -301,7 +301,7 @@ def write_markdown(out, rows, t_res, d_eff, boot, comp_stats, max_diff,
     md.append("**Metric version: v1.1 (decomposition `D = w_A D_arrival + w_G D_growth`)**\n\n")
     md.append("| Field | Value |\n| --- | --- |\n"
               "| **Owner** | data_scientist |\n"
-              "| **Anchor** | H0.anchor_4 (Day-2, claimed by ml_engineer_claude on 2026-06-10 15:24 JST) |\n"
+              "| **Anchor** | H0.anchor_4 (Day-2 audit, 2026-06-10 15:24 JST) |\n"
               "| **Source data** | `experiments/logs/anchor4_phase1_smoke/` (5 tasks × {H0_raw, H2_risk_gated} × {K=1, K=3}) |\n"
               "| **Tooling** | `experiments/metrics/d_belief.py` v1 (default weights) |\n"
               "| **Tests passed** | metrics: 44/44 (see SETUP_DAY1_REPORT and METRICS_SPEC §6) |\n\n")

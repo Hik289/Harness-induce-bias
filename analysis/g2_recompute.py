@@ -149,7 +149,7 @@ def g2_table1() -> dict:
             rows = []
             n_missing = 0
             for task in G2_TASKS:
-                bo_h0 = load_final_belief(g2_base_path(H_AS := "H0_raw", task, K))
+                bo_h0 = load_final_belief(g2_base_path("H0_raw", task, K))
                 bo_hx = load_final_belief(g2_base_path(hx, task, K))
                 if bo_h0 is None or bo_hx is None:
                     n_missing += 1

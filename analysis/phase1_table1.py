@@ -323,9 +323,6 @@ def h3_polarity_analysis(rows: list[dict]) -> dict:
     """H3 backfire / polarity audit: H0 vs H3 paired Δ D_growth direction at K=3,5,8."""
     out = {}
     for k in (3, 5, 8):
-        pairs = [(r["task"], r["seed"]) for r in rows
-                 if r["status"] == "ok" and r["ha"] == "H0_raw"
-                 and r["hb"] == "H3_repair_heavy" and r["K"] == k]
         # collect K and K=1 sides
         d_K = {(r["task"], r["seed"]): r["D_growth"] for r in rows
                if r["status"] == "ok" and r["ha"] == "H0_raw"

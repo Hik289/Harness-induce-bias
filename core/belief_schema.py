@@ -1,16 +1,9 @@
 """Belief / log JSON schema (readme §9.1 + §15).
 
-为下游 data_scientist 的 D_belief / ECE / AUROC 模块提供稳定 schema。
-本 schema 用 jsonschema Draft-2020-12 表达, validator 暴露 validate_belief() /
-validate_step_log()。
-
-设计选择:
-- belief_state 的枚举值严格对齐 readme §9.1 (task_progress / risk_state /
-  recoverability / likely_failure_mode), data_scientist 可直接按 categorical
-  mismatch 算 D_belief
-- predicted_future 中所有概率 0..1, uncertainty 0..1
-- 允许 belief_state.extras / predicted_future.extras 字段, harness 可附加未来
-  分析需要的额外信息, 不影响 schema 校验
+The Draft 2020-12 schema provides a stable interface for the D_belief, ECE,
+and AUROC analyses. Enumerated belief-state fields follow README Section 9.1,
+all probabilities lie in ``[0, 1]``, and the ``extras`` objects permit
+analysis-specific metadata without weakening validation of required fields.
 """
 from __future__ import annotations
 

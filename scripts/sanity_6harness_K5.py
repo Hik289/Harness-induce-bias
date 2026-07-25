@@ -1,7 +1,8 @@
-"""6-harness × 1-task × K=5 sanity: 把所有 6 harness 跑同一 task 同一 seed K=5,
-把 belief JSON 摆在一起看, 确认 harness 间差异是 categorical (action / failure_mode
-/ risk_state / progress) 而不只是 numeric noise. Director 指定的 Day-2 最后一道
-sanity (anchor_4 之外的扩展 check).
+"""Run all six harnesses on one task and compare their final beliefs.
+
+The check verifies that harness differences affect categorical fields such as
+the recommended action, failure mode, risk state, and progress, rather than
+only adding numeric noise.
 """
 from __future__ import annotations
 
@@ -76,7 +77,7 @@ def main(out_dir: str, task_id: str, K: int, seed: int) -> int:
         print(
             f"  [{hid:<28s}] progress={bs['task_progress']:<8s} risk={bs['risk_state']:<6s} "
             f"recov={bs['recoverability']:<6s} fail_mode={bs['likely_failure_mode']:<22s} "
-            f"unc={bs['uncertainty']:.2f}",
+            f"unc={bs['uncertainty']:.2f} action={act}",
             flush=True,
         )
 
@@ -104,7 +105,7 @@ def main(out_dir: str, task_id: str, K: int, seed: int) -> int:
         for hid in hids
     }
 
-    # 判 "categorical 差异 vs numeric noise"
+    # Separate categorical differences from changes in numeric confidence.
     progress_set = {v["task_progress"] for v in cat_view.values()}
     risk_set = {v["risk_state"] for v in cat_view.values()}
     fmode_set = {v["likely_failure_mode"] for v in cat_view.values()}
@@ -115,7 +116,8 @@ def main(out_dir: str, task_id: str, K: int, seed: int) -> int:
         len(fmode_set) +
         action_unique
     )
-    # 6 harness 之间, 任何一种 categorical 字段至少出现 2 个值算"有差异"
+    # A differing categorical field is sufficient; actions require three
+    # variants to avoid counting a single formatting outlier.
     categorical_diff_present = (
         len(progress_set) >= 2 or len(risk_set) >= 2 or
         len(fmode_set) >= 2 or action_unique >= 3
@@ -130,6 +132,7 @@ def main(out_dir: str, task_id: str, K: int, seed: int) -> int:
         "harnesses": hids,
         "categorical_diff_present": categorical_diff_present,
         "categorical_summary": {
+            "categorical_signal_count": categorical_signals,
             "task_progress_values": sorted(progress_set),
             "risk_state_values": sorted(risk_set),
             "likely_failure_mode_values": sorted(fmode_set),

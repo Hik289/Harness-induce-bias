@@ -14,11 +14,15 @@ Code release for the paper:
 
 This repository studies how the execution harness around a fixed LLM changes the model's belief trajectory. The same task and same base model can produce different risk estimates, failure modes, and action preferences when the harness changes what the model observes, blocks, repairs, verifies, or logs.
 
-## Repository Summary
+## At A Glance
 
-- **Scope.** How much can the execution harness around a fixed LLM change its belief trajectory and downstream actions?
-- **Method.** HIBench varies observations, blocking, repair, verification, and logging while holding the base task and model fixed.
-- **Contents.** Harness variants, belief-divergence metrics, benchmark adapters, long-horizon studies, and plotting scripts.
+| Artifact review question | Entry point |
+| --- | --- |
+| Research question | How much can the execution harness around a fixed LLM change its belief trajectory and downstream actions? |
+| Core method | HIBench varies observations, blocking, repair, verification, and logging while holding the base task and model fixed. |
+| Included artifacts | Harness variants, belief-divergence metrics, benchmark adapters, long-horizon studies, and plotting scripts. |
+| Fast validation | `python -m pytest tests/test_smoke.py` |
+| Paper-scale reproduction | `python scripts/phase1_main.py --out logs/phase1_main` and the benchmark scripts. |
 
 ## Motivation
 

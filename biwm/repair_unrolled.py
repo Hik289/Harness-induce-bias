@@ -29,11 +29,6 @@ def _unroll_history(history: list[dict]) -> list[str]:
     for h in history[-5:]:
         step = h.get("step", 0)
         act = h.get("selected_action") or "(noop)"
-        # H3 在 attempt_repair 里把每个 step >=1 标 occurred=True; rollout 写到
-        # action_history 用的字段是 "selected_action" / "blocked" / "step",
-        # 但 repair 信息只在 step_log; 这里从 step_log 视角无法直接拿到, 所以
-        # 我们用一个保守 heuristic: 如果 inner harness 是 repair-heavy, 默认
-        # 假设每步都触发了 hidden repair, 改成 explicit 展开。
         lines.append(
             f"  step {step}:\n"
             f"    action_proposed: {act!r}\n"

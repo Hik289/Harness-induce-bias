@@ -48,11 +48,6 @@ MARKERS = {
 # K-axis (the 7 measured horizon points)
 K_VALUES = [1, 3, 5, 8, 12, 16, 20]
 
-# D_belief(pair, K).  Each row monotonically grows except for the K=5 dip
-# (failure_mode relabel briefly *reduces* the gap before risk-gating
-# divergence dominates again).  Anchored: H0_vs_H2 at K=5 → 0.45.
-# Real data from analysis/long_horizon_analysis.md §2 (n=8/cell, seed=42)
-# K values: [1, 3, 5, 8, 12, 16, 20]
 DATA = {
     "H0_vs_H1": [0.404, 0.445, 0.457, 0.494, 0.482, 0.485, 0.479],
     "H0_vs_H2": [0.368, 0.453, 0.365, 0.454, 0.430, 0.430, 0.484],  # K=5 dip 0.453→0.365

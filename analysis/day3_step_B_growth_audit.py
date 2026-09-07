@@ -194,10 +194,6 @@ def main() -> int:
     scalar_K5 = [r["scalar_K5"] for r in rows]
     scalar_K8 = [r["scalar_K8"] for r in rows]
 
-    # Two ratio aggregations (both reported — they answer different questions):
-    #   (a) ratio_of_means: stable, "what is the population K-amp factor"
-    #   (b) mean_of_ratios: ml_eng's choice in SETUP_DAY3 §3.2, dominated by
-    #       per-task tail. Useful for "how many tasks show the predicted effect"
     ratio_of_means_K5 = statistics.fmean(growth_K5) / statistics.fmean(growth_K1)
     ratio_of_means_K8 = statistics.fmean(growth_K8) / statistics.fmean(growth_K1)
     ratios_K5_finite = [r["growth_ratio_K5_K1"] for r in rows

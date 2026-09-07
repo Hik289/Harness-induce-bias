@@ -76,10 +76,6 @@ def main(out_dir: str, n_tasks: int | None) -> int:
     total_calls = 0
     completed = 0
 
-    # iterate task-major so each task's all 24 runs (6 har × 4 K × 3 seed) finish
-    # before moving on; this makes interrupted partial states easy to resume.
-    # within a task, iterate seed→harness→K so seeds interleave (less risk of
-    # one seed dominating context-cache patterns).
     for task in tasks:
         for seed in SEEDS:
             for hid, harness in harnesses.items():

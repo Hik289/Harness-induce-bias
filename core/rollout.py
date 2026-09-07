@@ -140,10 +140,6 @@ def run_kstep_rollout(
 
     prev_belief: Optional[dict] = None
     action_history: list[dict] = []
-    # Inject horizon + run-level metadata into task dict so harnesses (e.g. H4)
-    # can adapt selective-verification policy to the actual K. Non-mutating
-    # contract: we set on a per-run shallow copy to avoid side effects across
-    # K calls when caller reuses the task object.
     task = dict(task)
     task["_rollout_horizon"] = horizon
     task["_run_id"] = run_id

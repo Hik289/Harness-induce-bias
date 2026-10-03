@@ -1,23 +1,3 @@
-"""K-step LLM belief rollout (readme §9.1 / §9.2 / §2.2).
-
-核心实现 (Day-1 SETUP_DAY1, 所有 harness 共用):
-  step 0: 把 task instruction + harness 给的 observation 喂给 LLM → belief_0
-  step t: belief_{t-1} + (假想/真实) action_{t-1} + step-t observation → belief_t
-  ...
-  step K: belief_K
-
-每一步都是一次独立 LLM call (绝不把整个 rollout 塞一个 prompt)。
-每一步输出严格 JSON, 通过 BELIEF_OUTPUT_SCHEMA 校验; 校验失败 → 客户端 retry
-(最多 2 次), 全失败 → 用 empty_belief_output() fallback 且写 schema_fail=True 到
-log, 不中断 rollout (这样 anchor_2 schema pass rate 才能被准确度量)。
-
-注意:
-- 这是 imaginary rollout: agent 在 step t 选了一个 candidate action, world
-  model rollout 在不真正执行 action 的前提下 imagine belief_{t+1}; 这是
-  multi-step LLM world model 的标准做法 (readme §9.2 "predicted belief_{t+1}")
-- 这区别于 H0 真实环境 step 推进: Day-1 暂不接环境, observation 在 step t≥1
-  时 = "agent 假设刚才选了 action X, harness 假想反馈" (由 harness 决定)
-"""
 from __future__ import annotations
 
 import json
@@ -80,7 +60,6 @@ def _build_step_prompt(
     horizon: int,
     harness_meta: dict,
 ) -> list[dict[str, str]]:
-    """每一步独立调用; prompt 包含 task / 当前 obs / 上一步 belief / 历史."""
     user_payload = {
         "task_id": task["task_id"],
         "task_instruction": task["instruction"],
@@ -93,7 +72,7 @@ def _build_step_prompt(
             "harness_meta": obs.meta,
         },
         "previous_belief_state": prev_belief,
-        "action_history": action_history[-5:],  # 最近 5 步避免 prompt 爆
+        "action_history": action_history[-5:],
     }
     user_msg = (
         f"## Step {step} of {horizon}\n\n"
@@ -120,7 +99,6 @@ def run_kstep_rollout(
     seed: int = 0,
     run_id: Optional[str] = None,
 ) -> dict[str, Any]:
-    """跑一条 K-step rollout, 写 K+1 条 step log; 返回 summary."""
     run_id = run_id or f"{harness.harness_id}_{task['task_id']}_K{horizon}_seed{seed}_{uuid.uuid4().hex[:6]}"
     summary: dict[str, Any] = {
         "run_id": run_id,
@@ -144,7 +122,7 @@ def run_kstep_rollout(
     task["_rollout_horizon"] = horizon
     task["_run_id"] = run_id
 
-    for step in range(horizon + 1):  # 0..K inclusive
+    for step in range(horizon + 1):
         observation = harness.make_observation(task, step, action_history)
 
         prompt = _build_step_prompt(
@@ -162,24 +140,20 @@ def run_kstep_rollout(
         llm_err: Optional[str] = None
         stats_dump: dict = {}
         try:
-            # Per-step seed = base seed + step idx. Some providers may not enforce
-            # determinism, but this still makes the three-seed design explicit.
             step_seed = (seed * 1000 + step) if seed is not None else None
             belief_obj, stats = llm.chat_json(prompt, max_tokens=1200, seed=step_seed)
             stats_dump = asdict(stats)
-            stats_dump.pop("raw_response", None)  # 避免日志爆量
+            stats_dump.pop("raw_response", None)
             summary["llm_calls"] += 1
             summary["total_tokens"] += stats.total_tokens
             summary["total_latency_s"] += stats.latency_s
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             llm_err = f"{type(e).__name__}: {e}"
             belief_obj = empty_belief_output(horizon=horizon)
             schema_fail = True
 
-        # belief schema check
         b_errs = validate_belief(belief_obj)
         if b_errs:
-            # 一次硬修复: 缺字段补 default, 再校验; 若仍不过, 用 fallback
             patched = _patch_belief(belief_obj, horizon)
             if not validate_belief(patched):
                 belief_obj = patched
@@ -192,16 +166,12 @@ def run_kstep_rollout(
         else:
             summary["schema_pass"] += 1
 
-        # harness gate: 拿 belief 里推荐的 action, 跑 candidate generation
         rec_action = belief_obj["next_action_recommendation"]["action"]
-        candidate_actions = [rec_action]  # Day-1 简化: 单候选; Day-2 起 H6 会
-                                          # rollout 3 candidate path
+        candidate_actions = [rec_action]
         decision = harness.gate_action(task, rec_action, candidate_actions)
 
-        # verifier (harness 决定是否运行)
         ver = harness.run_verifier(task, step, decision.selected_action)
 
-        # repair: Day-1 不触发, 留给 H3
         repair = harness.attempt_repair(task, decision.selected_action, {})
 
         step_record = {
@@ -246,7 +216,6 @@ def run_kstep_rollout(
         }
         step_record = harness.filter_log(step_record)
 
-        # validate full step log; collect errors but don't crash
         log_errs = validate_step_log(step_record)
         if log_errs:
             summary["step_log_validation_errors"].append({"step": step, "errs": log_errs[:5]})
@@ -254,7 +223,6 @@ def run_kstep_rollout(
         logger.write(step_record)
         summary["steps_written"] += 1
 
-        # bookkeeping
         action_history.append(
             {"step": step, "selected_action": decision.selected_action, "blocked": decision.blocked_actions}
         )
@@ -265,7 +233,6 @@ def run_kstep_rollout(
 
 
 def _patch_belief(obj: Any, horizon: int) -> dict:
-    """尽力补齐 belief 缺字段; 不改 LLM 已填的合理值."""
     template = empty_belief_output(horizon=horizon)
     if not isinstance(obj, dict):
         return template

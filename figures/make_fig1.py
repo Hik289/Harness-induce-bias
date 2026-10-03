@@ -1,4 +1,3 @@
-"""Regenerate fig1_overview.pdf with clean, readable layout."""
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -12,35 +11,29 @@ plt.rcParams.update({'font.size': 8, 'font.family': 'DejaVu Sans'})
 K = np.array([1, 3, 5, 8])
 x_pos = np.linspace(0.1, 0.9, 4)
 
-# ─── Panel A: Phenomenon ───────────────────────────────────────────────
 ax = axes[0]
 ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis('off')
 ax.set_title('(A)  Same task + same LLM, different harnesses', fontsize=8, fontweight='bold', pad=4)
 
-# Input box
 ax.add_patch(plt.FancyBboxPatch((0.25, 0.85), 0.50, 0.10,
     boxstyle='round,pad=0.02', fc='#f3f4f6', ec='#6b7280', lw=1))
 ax.text(0.50, 0.905, 'Same task  /  Same LLM', ha='center', va='center', fontsize=7.5)
 
-# Arrows down to two harness boxes
 ax.annotate('', xy=(0.22, 0.73), xytext=(0.38, 0.85),
             arrowprops=dict(arrowstyle='->', lw=1.2, color='#374151'))
 ax.annotate('', xy=(0.78, 0.73), xytext=(0.62, 0.85),
             arrowprops=dict(arrowstyle='->', lw=1.2, color='#374151'))
 
-# H0 box
 ax.add_patch(plt.FancyBboxPatch((0.03, 0.60), 0.35, 0.14,
     boxstyle='round,pad=0.02', fc='#dbeafe', ec='#2563eb', lw=1.2))
 ax.text(0.205, 0.675, 'H0  raw harness', ha='center', va='center',
         fontsize=7.5, color='#1e40af', fontweight='bold')
 
-# H2 box
 ax.add_patch(plt.FancyBboxPatch((0.62, 0.60), 0.35, 0.14,
     boxstyle='round,pad=0.02', fc='#ffedd5', ec='#ea580c', lw=1.2))
 ax.text(0.795, 0.675, 'H2  risk-gated', ha='center', va='center',
         fontsize=7.5, color='#9a3412', fontweight='bold')
 
-# Diverging belief trajectories (schematic lines)
 ax_inner = ax.inset_axes([0.05, 0.05, 0.90, 0.50])
 ax_inner.set_xlim(0.5, 8.5); ax_inner.set_ylim(0.10, 0.35)
 ax_inner.spines['top'].set_visible(False); ax_inner.spines['right'].set_visible(False)
@@ -55,18 +48,15 @@ ax_inner.annotate('1.65× growth\n(K=1→K=5)', xy=(5, 0.257), xytext=(6.2, 0.28
                   fontsize=6, color='#1e40af',
                   arrowprops=dict(arrowstyle='->', lw=0.8, color='#1e40af'))
 
-# ─── Panel B: BIWM Alignment ──────────────────────────────────────────
 ax = axes[1]
 ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis('off')
 ax.set_title('(B)  Cross-harness alignment (\u200bBIWM)', fontsize=8, fontweight='bold', pad=4)
 
-# BIWM box
 ax.add_patch(plt.FancyBboxPatch((0.15, 0.75), 0.70, 0.16,
     boxstyle='round,pad=0.02', fc='#dcfce7', ec='#16a34a', lw=1.5))
 ax.text(0.50, 0.845, 'BIWM  (canonicalise / log / align)', ha='center', va='center',
         fontsize=7.5, color='#14532d', fontweight='bold')
 
-# Alignment chart
 ax_inner2 = ax.inset_axes([0.05, 0.05, 0.90, 0.58])
 ax_inner2.set_xlim(0.5, 8.5)
 ax_inner2.set_ylim(0.13, 0.20)

@@ -1,18 +1,3 @@
-"""SWE-bench Verified subset adapter (Day 8).
-
-Loads princeton-nlp/SWE-bench_Verified via HuggingFace `datasets`, picks a
-stratified subset (by repo), and maps to our task dict format. Imagined rollout
-only — does not execute the real repos / docker images.
-
-Field mapping (TB-style):
-- task.instance_id          → task_id  (prefixed "swe_")
-- task.problem_statement    → instruction + raw_observation (terminal-style)
-- task.repo                 → category
-- task.hints_text (if any)  → safe_actions hint
-- task.test_patch (parsed)  → verifier_hint (test file paths)
-- BIWM-2 destructive keys   → risky_actions
-- []                        → distractor_paths (per Day-5 §8.4 decision)
-"""
 from __future__ import annotations
 
 import random
@@ -46,7 +31,6 @@ def _short(s: str, n: int) -> str:
 
 
 def _parse_test_files(test_patch: str) -> list[str]:
-    """SWE-bench's test_patch is a unified diff. Extract `+++ b/<path>` files."""
     if not test_patch:
         return []
     files = []
@@ -77,14 +61,12 @@ def _make_raw_observation(instr: str, repo: str, instance_id: str) -> str:
 
 
 def _stratified_pick(rows: list[dict], n: int, seed: int = 42) -> list[dict]:
-    """Stratified pick by repo: roughly equal across distinct repos."""
     rng = random.Random(seed)
     by_repo: dict[str, list[dict]] = {}
     for r in rows:
         by_repo.setdefault(r["repo"], []).append(r)
     for repo in by_repo:
         rng.shuffle(by_repo[repo])
-    # round-robin across repos
     repos = list(by_repo.keys())
     rng.shuffle(repos)
     picked: list[dict] = []
@@ -104,9 +86,8 @@ def load_swebench_tasks(
     dataset_name: str = "princeton-nlp/SWE-bench_Verified",
     split: str = "test",
 ) -> list[dict]:
-    """Load SWE-bench Verified, return HIBench-shaped task list."""
     try:
-        from datasets import load_dataset  # type: ignore
+        from datasets import load_dataset
     except ImportError as e:
         raise RuntimeError(
             "Need `pip install datasets` to load SWE-bench."

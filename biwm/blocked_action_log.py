@@ -1,14 +1,3 @@
-"""BIWM-2: Blocked-Action Logging (readme §11.2).
-
-H2 风险阻断的关键 bias 来源: agent 不知道哪些 action 被阻塞, 也不知道阻塞的
-原因 → blocked-branch censorship. BIWM-2 在 observation 里**显式补回**:
-- 上一步 candidate action 是什么
-- 哪些被阻塞 (string + reason)
-- 风险估计 (如果有)
-- "要安全执行需要什么补充" (heuristic, e.g. "限定 path 在 logs/ 目录" 或 "加 dry-run")
-
-只对 risk-gated 类 harness 起作用 (本项目 H2). 对其他 harness 退化为 noop.
-"""
 from __future__ import annotations
 
 from typing import Any
@@ -38,9 +27,6 @@ def _safe_execution_hint(reason: str) -> str:
 
 
 class BlockedActionLogWrapper(Harness):
-    """包一层 harness, 在 make_observation 时把上一步的 blocked actions 显式
-    写进 observation, 给出风险原因和安全执行 hint。
-    """
 
     def __init__(self, inner: Harness) -> None:
         self.inner = inner
@@ -49,14 +35,13 @@ class BlockedActionLogWrapper(Harness):
     def make_observation(self, task: dict, step: int, history: list[dict]) -> Observation:
         inner_obs = self.inner.make_observation(task, step, history)
         if step == 0:
-            return inner_obs  # no prior block to report
+            return inner_obs
 
         last = history[-1] if history else {}
         blocked = last.get("blocked") or []
         if not blocked:
             return inner_obs
 
-        # 重组: 加 blocked-action log 块到 raw_text 前面
         block_log_lines: list[str] = ["[BLOCKED-ACTION LOG]"]
         for ba in blocked[:5]:
             hint = _safe_execution_hint(ba)

@@ -1,4 +1,3 @@
-"""Thread-naive JSONL logger; 一行一 step. readme §15 格式."""
 from __future__ import annotations
 
 import json
@@ -16,12 +15,10 @@ def now_jst_iso() -> str:
 
 
 class JSONLLogger:
-    """每个 run 一个 logger; 写到 logs/<run_id>.jsonl. 多 thread 安全."""
 
     def __init__(self, log_path: str | os.PathLike[str]) -> None:
         self._path = Path(log_path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        # touch
         self._path.touch(exist_ok=True)
         self._lock = threading.Lock()
         self.line_count = 0

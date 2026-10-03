@@ -1,8 +1,3 @@
-"""Day 8 Task 2b: SWE-bench Verified subset descriptive replication.
-
-10 task × H0/H1/H2 × K∈{3, 5} × seed=42 = 60 new run.
-Imagined rollout (Director Day-2 决策, 不在 hpc 跑真实 docker).
-"""
 from __future__ import annotations
 
 import argparse
@@ -20,12 +15,12 @@ for _p in (str(_EXPERIMENTS.parent), str(_SKELETON), str(_EXPERIMENTS)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from skeleton.benchmark.swebench_adapter import load_swebench_tasks  # noqa: E402
-from skeleton.core.jsonl_logger import JSONLLogger  # noqa: E402
-from skeleton.core.llm_client import LLMClient  # noqa: E402
-from skeleton.core.rollout import run_kstep_rollout  # noqa: E402
-from skeleton.harnesses import HARNESS_REGISTRY  # noqa: E402
-from metrics.d_belief import d_belief_components  # noqa: E402
+from skeleton.benchmark.swebench_adapter import load_swebench_tasks
+from skeleton.core.jsonl_logger import JSONLLogger
+from skeleton.core.llm_client import LLMClient
+from skeleton.core.rollout import run_kstep_rollout
+from skeleton.harnesses import HARNESS_REGISTRY
+from metrics.d_belief import d_belief_components
 
 JST = timezone(timedelta(hours=9))
 
@@ -93,7 +88,6 @@ def main(out_dir: str, n_tasks: int) -> int:
                     eta = elapsed / completed * (n_expected - completed)
                     print(f"  [{completed}/{n_expected}] elapsed={elapsed/60:.1f}min eta={eta/60:.1f}min tokens={total_tokens/1000:.1f}K crashed={len(crashed)}", flush=True)
 
-    # D_belief 描述性: H0 vs H1 / H0 vs H2 per K
     print("\n=== D_belief per pair × K ===", flush=True)
     table: dict[str, dict] = {}
     for hx in ("H1_structured", "H2_risk_gated"):

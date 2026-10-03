@@ -1,9 +1,3 @@
-"""Run all six harnesses on one task and compare their final beliefs.
-
-The check verifies that harness differences affect categorical fields such as
-the recommended action, failure mode, risk state, and progress, rather than
-only adding numeric noise.
-"""
 from __future__ import annotations
 
 import argparse
@@ -20,12 +14,12 @@ for _p in (str(_EXPERIMENTS.parent), str(_SKELETON), str(_EXPERIMENTS)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from skeleton.benchmark.hibench_loader import load_tasks  # noqa: E402
-from skeleton.core.jsonl_logger import JSONLLogger  # noqa: E402
-from skeleton.core.llm_client import LLMClient  # noqa: E402
-from skeleton.core.rollout import run_kstep_rollout  # noqa: E402
-from skeleton.harnesses import HARNESS_REGISTRY  # noqa: E402
-from metrics.d_belief import d_belief_components  # noqa: E402
+from skeleton.benchmark.hibench_loader import load_tasks
+from skeleton.core.jsonl_logger import JSONLLogger
+from skeleton.core.llm_client import LLMClient
+from skeleton.core.rollout import run_kstep_rollout
+from skeleton.harnesses import HARNESS_REGISTRY
+from metrics.d_belief import d_belief_components
 
 JST = timezone(timedelta(hours=9))
 
@@ -81,7 +75,6 @@ def main(out_dir: str, task_id: str, K: int, seed: int) -> int:
             flush=True,
         )
 
-    # pairwise D_belief across the 6
     hids = list(HARNESS_REGISTRY.keys())
     pairwise: list[dict] = []
     for i in range(len(hids)):
@@ -105,7 +98,6 @@ def main(out_dir: str, task_id: str, K: int, seed: int) -> int:
         for hid in hids
     }
 
-    # Separate categorical differences from changes in numeric confidence.
     progress_set = {v["task_progress"] for v in cat_view.values()}
     risk_set = {v["risk_state"] for v in cat_view.values()}
     fmode_set = {v["likely_failure_mode"] for v in cat_view.values()}
@@ -116,8 +108,6 @@ def main(out_dir: str, task_id: str, K: int, seed: int) -> int:
         len(fmode_set) +
         action_unique
     )
-    # A differing categorical field is sufficient; actions require three
-    # variants to avoid counting a single formatting outlier.
     categorical_diff_present = (
         len(progress_set) >= 2 or len(risk_set) >= 2 or
         len(fmode_set) >= 2 or action_unique >= 3

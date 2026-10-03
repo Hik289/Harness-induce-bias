@@ -43,6 +43,12 @@ Main tracked entry points for paper-scale or benchmark-scale runs:
 
 - `figures/intuition.pdf`
 - `figures/intuition.png`
+- `figures/main_process.pdf`
+- `figures/main_process.png`
+
+The final main figures are image-generated artwork, with matching PDF exports. The original plotting scripts are retained as editable sources for earlier designs and analytic plots.
+
+`figures/make_long_horizon.py` contains placeholder curve data, as documented in its original source. Replace that data with the authenticated analysis table before using its output as an experimental result.
 
 ## Data And Outputs
 

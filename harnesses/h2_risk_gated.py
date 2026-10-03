@@ -1,19 +1,3 @@
-"""H2 Risk-Gated Harness (readme §8 H2 + §10.1 expected H0 vs H2 high divergence).
-
-与 H0 Raw 的核心差异 (prompt-side, 必须是 LLM 看得见的差异):
-- observation 在 raw_text 前面显式列出 "🚫 此环境禁止以下高风险动作类别" 列表
-  (拉自 task.risky_actions + 项目级 destructive_keywords); LLM 看见这个列表
-  就会调整 candidate generation
-- gate_action 进行字符串匹配 + 关键词扫描, 命中 risky_actions / destructive
-  pattern 即标 blocked; selected_action 强制为 None 并附"被拒绝"原因
-- 当本步被 block, observation 在下一 step 显式告知"step t 的 action X 被
-  policy gate 拦截"
-- readme §11.2 警告: blocked-branch censorship 会让 risky-branch belief 不收敛;
-  这正是 H0 vs H2 的预期分歧来源 (failure_mode / risk_state 在 K>=3 时漂移)
-
-注: H2 不实施 BIWM-2 blocked-action *logging* (那是 H6 / BIWM 的活)。H2 只是
-"censor", 不主动给 agent 补任何被阻塞分支的信息。
-"""
 from __future__ import annotations
 
 from typing import Any
@@ -41,7 +25,6 @@ _DESTRUCTIVE_KEYWORDS: tuple[str, ...] = (
 
 
 def _is_blocked(candidate: str, task: dict) -> tuple[bool, list[str]]:
-    """命中 risky_actions / destructive_keywords -> blocked."""
     reasons: list[str] = []
     lower = candidate.lower()
     for risky in task.get("risky_actions", []) or []:

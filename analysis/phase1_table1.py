@@ -1,30 +1,3 @@
-"""Phase-1 Table 1 builder.
-
-Implements `analysis/phase1_stats_protocol.md v2` end-to-end:
-
-- Loads all 576 main-table jsonls (6 harness × 8 task × 4 K × 3 seed).
-- Computes D_belief / D_arrival / D_growth on the *final-step* belief_output
-  of each rollout for every pair × task × K × seed cell, then writes the
-  per-row CSV `analysis/phase1_table1.csv`.
-- Aggregates pairwise (H_a, H_b) means + 5-component breakdown per K.
-- Runs the G1 ratio test (D_growth ratio_of_means K/K=1 with bootstrap CI)
-  and the §5 paired one-sided test (Δ D_growth = D_growth(K) − D_growth(K=1))
-  for every pair × K cell.
-- Bonferroni: |F_primary| = 5 H0-vs-Hx × {K=5, K=8} = 10, α=0.001.
-- Identity audit: every row checks D_scalar ≈ 0.30·D_A + 0.70·D_G; max
-  residual reported (halt rule if > 1e-9).
-- Renders `analysis/phase1_results.md` with the headline table + per-pair
-  growth ratios + 5-component decomposition + H3 polarity finding + H2
-  censorship audit.
-
-Pair family covered:
-    Primary G1 family:    {(H0, H1..H5)} × {K=5, K=8}   (|F|=10, α=0.001)
-    Diagnostic grid:      all 15 pairwise harness combinations × {K=3, 5, 8}
-                          (descriptive, not Bonferroni-binding)
-
-Run:
-    python3 analysis/phase1_table1.py
-"""
 from __future__ import annotations
 
 import csv
@@ -43,7 +16,7 @@ EXP = ROOT / "experiments"
 sys.path.insert(0, str(EXP / "skeleton"))
 sys.path.insert(0, str(EXP))
 
-from metrics.d_belief import (  # noqa: E402
+from metrics.d_belief import (
     ARRIVAL_GROUP_WEIGHT, GROWTH_GROUP_WEIGHT,
     d_belief_decomposition,
 )
@@ -70,9 +43,7 @@ RNG_SEED = 42
 N_BOOT = 10000
 
 
-# ----- utilities ------------------------------------------------------------
 def load_final_belief(path: Path) -> dict | None:
-    """Return final-step belief_output (the K-step rollout endpoint)."""
     text = path.read_text()
     if not text.strip():
         return None
@@ -94,7 +65,6 @@ def jsonl_path(harness: str, task: str, K: int, seed: int) -> Path:
     return LOG_DIR / f"{harness}_{task}_K{K}_seed{seed}.jsonl"
 
 
-# ----- step 1: load all final beliefs ---------------------------------------
 def load_all_beliefs() -> dict[tuple[str, str, int, int], dict]:
     out: dict[tuple[str, str, int, int], dict] = {}
     missing = []
@@ -111,11 +81,9 @@ def load_all_beliefs() -> dict[tuple[str, str, int, int], dict]:
     return out, missing
 
 
-# ----- step 2: per-row decomposition ----------------------------------------
 def per_row(beliefs: dict) -> list[dict]:
-    """For each (Ha, Hb, task, K, seed) pair, compute decomposition."""
     rows = []
-    pairs = list(itertools.combinations(HARNESSES, 2))  # 15 pairs
+    pairs = list(itertools.combinations(HARNESSES, 2))
     for ha, hb in pairs:
         for t in TASKS:
             for k in KS:
@@ -157,7 +125,6 @@ def per_row(beliefs: dict) -> list[dict]:
     return rows
 
 
-# ----- statistical helpers --------------------------------------------------
 def paired_t_one_sided(deltas: list[float]) -> dict:
     n = len(deltas)
     if n < 2:
@@ -169,7 +136,7 @@ def paired_t_one_sided(deltas: list[float]) -> dict:
     t = mean / se if se > 0 else float("inf")
     df = n - 1
     try:
-        from scipy.stats import t as student_t  # noqa: WPS433
+        from scipy.stats import t as student_t
         p_one = float(1 - student_t.cdf(t, df))
     except Exception:
         from math import erf, sqrt
@@ -192,7 +159,6 @@ def bootstrap_ratio_of_means(
     num: list[float], den: list[float],
     n_boot: int = N_BOOT, seed: int = RNG_SEED, alpha: float = 0.05,
 ) -> dict:
-    """Paired-index bootstrap on ratio_of_means(num/den)."""
     rng = np.random.default_rng(seed)
     a = np.asarray(num, dtype=float)
     b = np.asarray(den, dtype=float)
@@ -233,7 +199,6 @@ def bootstrap_mean(values: list[float], n_boot=N_BOOT, seed=RNG_SEED, alpha=0.05
     }
 
 
-# ----- step 3: pair × K aggregation -----------------------------------------
 def aggregate(rows: list[dict]):
     by_pair_K: dict[tuple[str, str, int], list[dict]] = {}
     for r in rows:
@@ -259,14 +224,11 @@ def aggregate(rows: list[dict]):
     return agg
 
 
-# ----- step 4: G1 + auxiliary tests -----------------------------------------
 def g1_tests(agg: dict) -> dict:
-    """For each (H0, Hb) × K∈{5,8} cell: ratio + paired-Δ tests."""
     results = {}
     primary_pairs = [(("H0_raw", hb), k) for hb in HARNESSES[1:]
-                     for k in (5, 8)]  # |F|=10
+                     for k in (5, 8)]
     for (ha, hb), k in primary_pairs:
-        # gather paired D_growth values keyed by (task, seed)
         rows_K = {(r["task"], r["seed"]): r
                   for r in agg.get((ha, hb, k), {}).get("rows", [])}
         rows_K1 = {(r["task"], r["seed"]): r
@@ -283,7 +245,6 @@ def g1_tests(agg: dict) -> dict:
         t_res = paired_t_one_sided(deltas)
         d = cohens_d(deltas)
         delta_boot = bootstrap_mean(deltas)
-        # G1 decision
         ratio_pass = (
             ratio["point"] >= 2.0
             and ratio["ci_lo"] >= 1.5
@@ -320,10 +281,8 @@ def g1_tests(agg: dict) -> dict:
 
 
 def h3_polarity_analysis(rows: list[dict]) -> dict:
-    """H3 backfire / polarity audit: H0 vs H3 paired Δ D_growth direction at K=3,5,8."""
     out = {}
     for k in (3, 5, 8):
-        # collect K and K=1 sides
         d_K = {(r["task"], r["seed"]): r["D_growth"] for r in rows
                if r["status"] == "ok" and r["ha"] == "H0_raw"
                and r["hb"] == "H3_repair_heavy" and r["K"] == k}
@@ -334,7 +293,6 @@ def h3_polarity_analysis(rows: list[dict]) -> dict:
         deltas = [d_K[kk] - d_K1[kk] for kk in keys]
         n_pos = sum(1 for d in deltas if d > 0)
         n_neg = sum(1 for d in deltas if d < 0)
-        # also do the same on the scalar D for context
         s_K = {(r["task"], r["seed"]): r["D_belief"] for r in rows
                if r["status"] == "ok" and r["ha"] == "H0_raw"
                and r["hb"] == "H3_repair_heavy" and r["K"] == k}
@@ -358,7 +316,6 @@ def h3_polarity_analysis(rows: list[dict]) -> dict:
 
 
 def h2_censorship_audit(beliefs: dict) -> dict:
-    """H2 fm-relabel + P(success) inflation on toy_007 — 12-point version."""
     task = "toy_007_destructive_action_trap"
     rows = []
     fm_H0 = []
@@ -410,7 +367,6 @@ def h2_censorship_audit(beliefs: dict) -> dict:
     }
 
 
-# ----- step 5: identity audit (halt rule) -----------------------------------
 def identity_audit(rows: list[dict]) -> dict:
     residuals = [r["identity_residual"] for r in rows if r["status"] == "ok"]
     max_residual = max(residuals) if residuals else 0.0
@@ -423,7 +379,6 @@ def identity_audit(rows: list[dict]) -> dict:
     }
 
 
-# ----- step 6: CSV writer ---------------------------------------------------
 def write_csv(rows: list[dict]):
     fields = [
         "pair", "ha", "hb", "task", "K", "seed", "status",
@@ -439,7 +394,6 @@ def write_csv(rows: list[dict]):
             w.writerow({k: r.get(k) for k in fields})
 
 
-# ----- step 7: markdown -----------------------------------------------------
 def render_md(agg, g1, identity, h3_polarity, h2_censor, missing_count,
               total_runs):
     md = []
@@ -479,7 +433,6 @@ def render_md(agg, g1, identity, h3_polarity, h2_censor, missing_count,
         )
     md.append(f"\n**G1-positive cells: {g1_positive_cells} / 10**\n\n")
 
-    # Decision rule branch
     md.append("### Decision (per `phase1_stats_protocol.md v2 §10`)\n\n")
     n_sig = sum(1 for r in g1.values() if r["sig_pass"])
     n_near_miss_p01 = sum(1 for r in g1.values()
@@ -645,7 +598,6 @@ def render_md(agg, g1, identity, h3_polarity, h2_censor, missing_count,
     OUT_MD.write_text("".join(md))
 
 
-# ----- main -----------------------------------------------------------------
 def main() -> int:
     beliefs, missing = load_all_beliefs()
     print(f"[load] n_beliefs={len(beliefs)} missing={len(missing)}")

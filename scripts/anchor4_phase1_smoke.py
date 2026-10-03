@@ -1,22 +1,3 @@
-"""anchor_4: Phase 1 smoke — H0 vs H2 K=3 在 5 toy task 上方向一致.
-
-对应 hypothesis_tree.md H0.anchor_4:
-- 内容: 在 5 个 toy task 上单 seed 跑 H0 (Raw) 和 H2 (Risk-Gated), paired
-  comparison D_belief(H0,H2,K=3) > D_belief(H0,H2,K=1) 方向一致
-- prediction: 5/5 task 上 D_belief 随 K 递增方向一致 (binomial p=0.03)
-- 这是 H0 主假设的最弱可验证版本; 失败 -> push back 不硬推
-
-逻辑:
-  for K in {1, 3}:
-    for task in 5 toy tasks:
-      H0 rollout (K) -> belief_K
-      H2 rollout (K) -> belief_K
-      D_K = d_belief(belief_K[H0], belief_K[H2])  # 终步 belief 比对
-  per-task: D_K=3 > D_K=1 计为 "方向一致"
-  统计: 5/5 一致 -> binomial p ≈ 0.03
-
-记 Director 的 H0.anchor_4 描述, K 设的是 1 和 3, 不是全 4 个 K。
-"""
 from __future__ import annotations
 
 import argparse
@@ -28,24 +9,23 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _HERE = Path(__file__).resolve()
-_EXPERIMENTS = _HERE.parents[2]                  # experiments/
-_SKELETON = _HERE.parents[1]                     # experiments/skeleton/
+_EXPERIMENTS = _HERE.parents[2]
+_SKELETON = _HERE.parents[1]
 for _p in (str(_EXPERIMENTS.parent), str(_SKELETON), str(_EXPERIMENTS)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from skeleton.benchmark.hibench_loader import load_tasks  # noqa: E402
-from skeleton.core.jsonl_logger import JSONLLogger  # noqa: E402
-from skeleton.core.llm_client import LLMClient  # noqa: E402
-from skeleton.core.rollout import run_kstep_rollout  # noqa: E402
-from skeleton.harnesses import H0RawHarness, H2RiskGatedHarness  # noqa: E402
-from metrics.d_belief import d_belief_components  # noqa: E402
+from skeleton.benchmark.hibench_loader import load_tasks
+from skeleton.core.jsonl_logger import JSONLLogger
+from skeleton.core.llm_client import LLMClient
+from skeleton.core.rollout import run_kstep_rollout
+from skeleton.harnesses import H0RawHarness, H2RiskGatedHarness
+from metrics.d_belief import d_belief_components
 
 JST = timezone(timedelta(hours=9))
 
 
 def _read_last_belief(jsonl_path: Path) -> dict:
-    """返回该 jsonl 文件最后一条 step 的 belief_output (即 belief_K)."""
     last_line = ""
     with jsonl_path.open("r", encoding="utf-8") as fh:
         for line in fh:
@@ -57,7 +37,6 @@ def _read_last_belief(jsonl_path: Path) -> dict:
 
 
 def _binomial_one_sided_pmf(k: int, n: int, p: float = 0.5) -> float:
-    """P(X >= k | n, p=0.5)."""
     from math import comb
     return sum(comb(n, i) * (p ** i) * ((1 - p) ** (n - i)) for i in range(k, n + 1))
 
@@ -99,7 +78,6 @@ def main(out_dir: str, tasks_path: str | None, seed: int, n_tasks: int) -> int:
                 task_row[f"{hid}_K{K}_tokens"] = summary["total_tokens"]
                 task_row[f"{hid}_K{K}_latency_s"] = round(summary["total_latency_s"], 2)
 
-        # D_belief paired comparison at K=1 and K=3
         c1 = d_belief_components(beliefs[("H0_raw", 1)], beliefs[("H2_risk_gated", 1)])
         c3 = d_belief_components(beliefs[("H0_raw", 3)], beliefs[("H2_risk_gated", 3)])
         task_row["D_K1"] = c1["D_belief"]
@@ -119,7 +97,7 @@ def main(out_dir: str, tasks_path: str | None, seed: int, n_tasks: int) -> int:
     n = len(per_task)
     k = sum(1 for r in per_task if r["direction_consistent"])
     p = _binomial_one_sided_pmf(k, n, 0.5)
-    anchor_passed = (k == n)  # strict: 5/5 (matches hypothesis_tree.md spec)
+    anchor_passed = (k == n)
 
     overall = {
         "anchor": "anchor_4",

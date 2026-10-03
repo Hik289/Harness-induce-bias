@@ -1,10 +1,3 @@
-"""anchor_2: HIBench-Code v0 toy 8 tasks × K∈{1,3,5,8} 在 H0 Raw harness 下
-端到端跑通; 全部 step 的 belief 满足 readme §9.1 schema; logs 满足 §15 JSONL
-格式 (100%).
-
-每个 (task, K) 写一个独立的 JSONL 文件; 总 summary 写到
-SETUP_DAY1_anchor2_summary.json。
-"""
 from __future__ import annotations
 
 import argparse
@@ -16,11 +9,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from skeleton.benchmark.hibench_loader import load_tasks  # noqa: E402
-from skeleton.core.jsonl_logger import JSONLLogger  # noqa: E402
-from skeleton.core.llm_client import LLMClient  # noqa: E402
-from skeleton.core.rollout import run_kstep_rollout  # noqa: E402
-from skeleton.harnesses.h0_raw import H0RawHarness  # noqa: E402
+from skeleton.benchmark.hibench_loader import load_tasks
+from skeleton.core.jsonl_logger import JSONLLogger
+from skeleton.core.llm_client import LLMClient
+from skeleton.core.rollout import run_kstep_rollout
+from skeleton.harnesses.h0_raw import H0RawHarness
 
 JST = timezone(timedelta(hours=9))
 K_VALUES = [1, 3, 5, 8]
@@ -75,7 +68,7 @@ def main(out_dir: str, tasks_path: str | None, seed: int, n_tasks: int | None) -
                     f"latency={summary['total_latency_s']:.1f}s",
                     flush=True,
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 err = {
                     "task_id": task["task_id"],
                     "K": K,

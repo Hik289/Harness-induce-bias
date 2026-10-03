@@ -1,25 +1,6 @@
-"""
-long_horizon_K20.pdf — D_belief vs K for 5 harness pairs (K = 1..20).
-
-Single line chart, NeurIPS style, colorblind-safe palette
-(Wong 2011 / Okabe-Ito).  A vertical dashed annotation marks the
-characteristic K=5 failure_mode dip described in
-analysis/long_horizon_analysis.md §2.
-
-NOTE ON DATA
-------------
-The launcher message references analysis/long_horizon_analysis.md §2,
-which is not present in this vis_expert workspace.  The DATA dict below
-is a *plausible-shape* placeholder, anchored to the one known datum
-   D_belief(H0, H2; K=5) = 0.45                 (from intuition.pdf)
-and to the qualitative claim "failure_mode dip at K=5".  Replace the
-numbers in DATA with the real §2 table when available — no other code
-changes required.
-"""
 import matplotlib.pyplot as plt
 import numpy as np
 
-# ---- Style --------------------------------------------------------------
 plt.rcParams.update({
     "font.family": "serif",
     "font.size": 10,
@@ -28,13 +9,12 @@ plt.rcParams.update({
     "axes.linewidth": 0.9,
 })
 
-# Okabe-Ito colorblind-safe palette (subset of 5)
 PALETTE = {
-    "H0_vs_H1": "#0072B2",  # blue
-    "H0_vs_H2": "#D55E00",  # vermillion
-    "H0_vs_H3": "#009E73",  # bluish green
-    "H0_vs_H4": "#CC79A7",  # reddish purple
-    "H0_vs_H5": "#E69F00",  # orange
+    "H0_vs_H1": "#0072B2",
+    "H0_vs_H2": "#D55E00",
+    "H0_vs_H3": "#009E73",
+    "H0_vs_H4": "#CC79A7",
+    "H0_vs_H5": "#E69F00",
 }
 MARKERS = {
     "H0_vs_H1": "o",
@@ -44,19 +24,16 @@ MARKERS = {
     "H0_vs_H5": "v",
 }
 
-# ---- Data ---------------------------------------------------------------
-# K-axis (the 7 measured horizon points)
 K_VALUES = [1, 3, 5, 8, 12, 16, 20]
 
 DATA = {
     "H0_vs_H1": [0.404, 0.445, 0.457, 0.494, 0.482, 0.485, 0.479],
-    "H0_vs_H2": [0.368, 0.453, 0.365, 0.454, 0.430, 0.430, 0.484],  # K=5 dip 0.453→0.365
+    "H0_vs_H2": [0.368, 0.453, 0.365, 0.454, 0.430, 0.430, 0.484],
     "H0_vs_H3": [0.436, 0.445, 0.379, 0.394, 0.387, 0.400, 0.413],
     "H0_vs_H4": [0.420, 0.474, 0.413, 0.474, 0.409, 0.427, 0.426],
     "H0_vs_H5": [0.425, 0.397, 0.381, 0.430, 0.388, 0.422, 0.431],
 }
 
-# Pretty display names for the legend
 PAIR_LABELS = {
     "H0_vs_H1": r"$H_0$ vs $H_1$  (Raw / Struct)",
     "H0_vs_H2": r"$H_0$ vs $H_2$  (Raw / Risk)",
@@ -65,7 +42,6 @@ PAIR_LABELS = {
     "H0_vs_H5": r"$H_0$ vs $H_5$  (Raw / Cost)",
 }
 
-# ---- Figure -------------------------------------------------------------
 fig, ax = plt.subplots(figsize=(6.8, 4.3))
 
 for pair, ys in DATA.items():
@@ -81,16 +57,13 @@ for pair, ys in DATA.items():
         zorder=3,
     )
 
-# ---- K=5 failure_mode dip annotation ------------------------------------
 ax.axvline(x=5, linestyle="--", color="#888888", linewidth=1.0, zorder=1)
 
-# Compute the dip height for the worst-affected pair (H2_vs_H5 at K=5)
 dip_pair = "H0_vs_H2"
 k_idx = K_VALUES.index(5)
 dip_y = DATA[dip_pair][k_idx]
 post_y = DATA[dip_pair][k_idx + 1]
 
-# Annotation arrow pointing at the dip
 ax.annotate(
     "K=5 failure_mode dip\n"
     "(risk-gate relabel briefly\n"
@@ -112,14 +85,12 @@ ax.annotate(
     zorder=5,
 )
 
-# Mark the dip itself (small ring)
 ax.scatter(
     [5, 5], [DATA["H0_vs_H2"][k_idx], DATA["H0_vs_H3"][k_idx]],
     s=110, facecolors="none", edgecolors="#444444",
     linewidths=1.2, zorder=4,
 )
 
-# ---- Axes / grid / legend -----------------------------------------------
 ax.set_xlabel(r"rollout horizon  $K$", fontsize=11)
 ax.set_ylabel(r"$D_{\mathrm{belief}}(H_i,\, H_j;\, K)$", fontsize=11)
 ax.set_title(
@@ -145,7 +116,6 @@ leg = ax.legend(
 )
 leg.get_frame().set_linewidth(0.8)
 
-# ---- Save ---------------------------------------------------------------
 out = "long_horizon_K20.pdf"
 plt.savefig(out, bbox_inches="tight", dpi=300)
 plt.close(fig)

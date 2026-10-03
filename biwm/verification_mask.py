@@ -1,10 +1,3 @@
-"""BIWM-4: Verification Mask (readme §11.4).
-
-H4 selective verification 的 bias 来源: agent 不能区分 "已 verify success" 和
-"未 verify, 当 success" — 容易过乐观. BIWM-4 在 observation 里**强制**显示每
-个声称 success 的中间步的 verification status (verified/cheap-only/unverified)
-+ verifier_type + cost, 让 LLM 必须把 "unverified" 当 uncertain 处理。
-"""
 from __future__ import annotations
 
 from typing import Any
@@ -22,14 +15,12 @@ class VerificationMaskWrapper(Harness):
     def __init__(self, inner: Harness) -> None:
         self.inner = inner
         self.harness_id = f"BIWM4_{inner.harness_id}"
-        # 内部状态: 每步的 verification 结果 (在 run_verifier 写, make_observation 读)
         self._last_verifier: dict[int, VerificationResult] = {}
 
     def make_observation(self, task: dict, step: int, history: list[dict]) -> Observation:
         inner_obs = self.inner.make_observation(task, step, history)
         if step == 0:
             return inner_obs
-        # 把过往 verification 状态汇成一个 mask
         mask_lines = ["[VERIFICATION MASK]"]
         for h in history[-6:]:
             s = h.get("step", 0)

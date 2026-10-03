@@ -1,17 +1,3 @@
-"""BIWM-5: Shadow Execution (readme §11.5).
-
-对高风险动作, 真实环境不执行, 但在 sandbox / dry-run 中执行并把"反事实结果"
-注入 observation, 这样 blocked-branch 不再是完全 censored。
-
-Director 派单允许"可简化": 我们用 **LLM-simulated shadow** (调用同一个 gpt-5.4-mini
-扮演 sandbox role) 而不是真实 copy-on-write repo. 这与 readme §11.5 的 narrative
-一致 ("Docker 或 copy-on-write 简化版"), 且不接真实环境 (Director Day-2 已拍
-imagined). 简化版用 deterministic rule-based shadow: 命中 risky 关键词时构造
-一条 "如果执行会发生 X" 的 shadow trace, 注入到 observation.
-
-注意: 这一组件 standalone 使用意义有限, 主要与 BIWM-2 配合 (BIWM-2 告诉 LLM
-被 block 的是什么, BIWM-5 告诉 LLM 在 sandbox 里执行的话长啥样).
-"""
 from __future__ import annotations
 
 from typing import Any
@@ -26,7 +12,6 @@ from ..core.harness_base import (
 
 
 def _simulate_shadow_outcome(blocked_action: str, task: dict) -> dict:
-    """Deterministic shadow simulator. 不调 LLM."""
     a = blocked_action.lower()
     if "rm -rf" in a or "rmtree" in a:
         return {

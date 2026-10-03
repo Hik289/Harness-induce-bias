@@ -30,9 +30,19 @@ This repository studies how the execution harness around a fixed LLM changes the
   <img src="figures/intuition.png" width="900" alt="Same task and same LLM, different harness, different belief">
 </p>
 
-The core phenomenon is simple: **same task + same LLM -> different harness -> different belief**. In the analogy above, the steak is unchanged, but the tool interface changes what the agent concludes about success.
+The core phenomenon is simple: **same task + same LLM -> different harness -> different belief**. In the analogy above, the steak is unchanged, but the tool interface changes the agent's belief about its taste.
 
-Source figure: [figures/intuition.pdf](figures/intuition.pdf)
+Download: [PNG](figures/intuition.png) · [PDF](figures/intuition.pdf)
+
+## Method Overview
+
+<p align="center">
+  <img src="figures/main_process.png" width="1100" alt="Harness-conditioned recursive belief forecasts, divergence measurement, and BIWM evidence preparation and alignment">
+</p>
+
+The fixed LLM recursively forecasts reports from a harness-visible record. BIWM evidence preparation exposes missing evidence, while cross-view alignment aggregates the resulting reports.
+
+Download: [PNG](figures/main_process.png) · [PDF](figures/main_process.pdf)
 
 ## Key Contributions
 
@@ -46,14 +56,14 @@ Source figure: [figures/intuition.pdf](figures/intuition.pdf)
 
 ```text
 .
-|-- core/                       # Belief schema, harness base, rollout, LLM client, JSONL logs
-|-- harnesses/                  # H0-H5 harness implementations
-|-- biwm/                       # Belief Induced World-Model alignment modules
-|-- benchmark/                  # HIBench, Terminal-Bench, and SWE-bench adapters
-|-- scripts/                    # Smoke tests, Phase 1 driver, benchmark runs
-|-- analysis/                   # Metric spec and table/figure recomputation
-|-- figures/                    # Figure scripts plus README intuition assets
-|-- tests/                      # Local no-LLM smoke tests
+|-- core/
+|-- harnesses/
+|-- biwm/
+|-- benchmark/
+|-- scripts/
+|-- analysis/
+|-- figures/
+|-- tests/
 |-- requirements.txt
 `-- README.md
 ```
@@ -124,7 +134,7 @@ python scripts/g2_terminal_bench.py
 python scripts/swebench_subset.py
 ```
 
-Generate figures:
+The current main figures are the PNG/PDF assets linked above. The retained plotting scripts generate earlier designs and analytic plots:
 
 ```bash
 python figures/make_fig1.py

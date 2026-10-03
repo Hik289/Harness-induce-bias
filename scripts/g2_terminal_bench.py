@@ -1,17 +1,3 @@
-"""Day 6 G2: Terminal-Bench descriptive replication.
-
-Director 派单 §8.3 最便宜方案:
-- 10 TB task (stratified by difficulty), seed=42 single, K ∈ {1, 5}
-- 6 harness baseline + 5 BIWM-wrapped + BIWM-full + post-hoc cross-harness aligned
-- 描述性 only, 无 p / Bonferroni / CI
-
-阶段:
-A. 6 harness × 10 task × K∈{1,5} × seed=42 = **120 base run** → Table 1 G2 复现
-B. 5 wrapper + BIWM-full × 10 task × K=5 × seed=42 = **60 BIWM run** → Table 2 G2 复现
-C. post-hoc cross-harness alignment (n=20: 10 task × 2 K) → BIWM-6/7 G2 复现
-
-不算 G1 / G3 strict test. 只报描述性 mean Δ + +/- consistency.
-"""
 from __future__ import annotations
 
 import argparse
@@ -29,17 +15,17 @@ for _p in (str(_EXPERIMENTS.parent), str(_SKELETON), str(_EXPERIMENTS)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from skeleton.benchmark.terminal_bench_adapter import load_terminal_bench_tasks  # noqa: E402
-from skeleton.core.jsonl_logger import JSONLLogger  # noqa: E402
-from skeleton.core.llm_client import LLMClient  # noqa: E402
-from skeleton.core.rollout import run_kstep_rollout  # noqa: E402
-from skeleton.harnesses import HARNESS_REGISTRY  # noqa: E402
-from skeleton.biwm import (  # noqa: E402
+from skeleton.benchmark.terminal_bench_adapter import load_terminal_bench_tasks
+from skeleton.core.jsonl_logger import JSONLLogger
+from skeleton.core.llm_client import LLMClient
+from skeleton.core.rollout import run_kstep_rollout
+from skeleton.harnesses import HARNESS_REGISTRY
+from skeleton.biwm import (
     CanonicalBeliefWrapper, BlockedActionLogWrapper, RepairUnrolledWrapper,
     VerificationMaskWrapper, ShadowExecutionWrapper, biwm_full,
     align_beliefs, self_consistency_score,
 )
-from metrics.d_belief import d_belief_components  # noqa: E402
+from metrics.d_belief import d_belief_components
 
 
 JST = timezone(timedelta(hours=9))
@@ -80,9 +66,8 @@ def main(out_dir: str) -> int:
     total_new = 0
     total_tokens = 0
 
-    # ============== Stage 1: 6 harness baseline (Table 1 G2) ==============
     print("\n=== Stage 1: 6 harness baseline 10 task × K∈{1,5} ===", flush=True)
-    base_idx: dict[tuple[str, str, int], dict] = {}  # (hid, task_id, K) → belief_K
+    base_idx: dict[tuple[str, str, int], dict] = {}
     base_summaries: list[dict] = []
     expected_base = len(tasks) * len(HARNESS_REGISTRY) * len(K_VALUES)
     done_base = 0
@@ -96,7 +81,7 @@ def main(out_dir: str) -> int:
                         base_idx[(hid, task["task_id"], K)] = belief
                         done_base += 1
                         continue
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         log_path.unlink(missing_ok=True)
                 harness = cls()
                 logger = JSONLLogger(log_path)
@@ -110,7 +95,7 @@ def main(out_dir: str) -> int:
                     base_summaries.append({**s, "log": str(log_path)})
                     total_new += 1
                     total_tokens += s["total_tokens"]
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     crashed.append({
                         "stage": "base", "task_id": task["task_id"],
                         "hid": hid, "K": K, "error": f"{type(e).__name__}: {e}"
@@ -122,7 +107,6 @@ def main(out_dir: str) -> int:
                     eta = elapsed / done_base * (expected_base - done_base)
                     print(f"  [base {done_base}/{expected_base}] elapsed={elapsed/60:.1f}min eta={eta/60:.1f}min tokens={total_tokens/1000:.0f}K", flush=True)
 
-    # ----- Table 1 (G2) per-harness D mean by K (5 components) -----
     print("\n=== Table 1 (G2): D_belief 5 components per (Hx, K) pairs ===", flush=True)
     table1: dict[str, dict] = {}
     target_pairs = [
@@ -155,7 +139,6 @@ def main(out_dir: str) -> int:
             table1[f"H0_vs_{hx}_K{K}"] = agg
             print(f"  H0 vs {hx:<28s} K={K}  n={agg['n']}  D={agg['D_belief_mean']:.3f}  cat={agg['cat_mismatch_mean']:.3f}  fail={agg['failure_mode_mismatch_mean']:.3f}  num={agg['num_distance_mean']:.3f}", flush=True)
 
-    # Quick K-amplification check (descriptive, no p)
     print("\n=== G1 G2 描述性 K-放大 (D K5/K1 ratio per pair, scalar D) ===", flush=True)
     k_amp_table = {}
     for h0, hx in target_pairs:
@@ -171,7 +154,6 @@ def main(out_dir: str) -> int:
         }
         print(f"  H0 vs {hx:<28s}  D_K1={D_K1:.3f}  D_K5={D_K5:.3f}  Δ=+{D_K5-D_K1:.3f}  ratio={D_K5/D_K1:.2f}x", flush=True)
 
-    # ============== Stage 2: BIWM Group A (5 single wrappers) + Group B (BIWM-full) on K=5 ==============
     print("\n=== Stage 2: BIWM Group A (single) + Group B (full) at K=5 ===", flush=True)
     group_a_results: dict[str, dict] = {}
     for label, hx_id, wrapper_cls in GROUP_A_BIWM:
@@ -185,7 +167,7 @@ def main(out_dir: str) -> int:
             if log_path.exists() and log_path.stat().st_size > 0:
                 try:
                     biwm_belief = _read_last_belief(log_path)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     log_path.unlink(missing_ok=True)
                     biwm_belief = None
             else:
@@ -203,7 +185,7 @@ def main(out_dir: str) -> int:
                     biwm_belief = _read_last_belief(log_path)
                     total_new += 1
                     total_tokens += s["total_tokens"]
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     crashed.append({"stage": "biwm_A", "label": label,
                                     "task_id": task["task_id"], "error": str(e)})
                     print(f"  [CRASH] {label} {task['task_id']}: {e}", flush=True)
@@ -240,7 +222,6 @@ def main(out_dir: str) -> int:
         }
         print(f"  {label:<22s} on {hx_id:<28s} n={len(per)}  D_base={m_base:.3f}  D_biwm={m_biwm:.3f}  Δ={m_biwm-m_base:+.3f}  (+/-: {group_a_results[f'{label}_on_{hx_id}']['n_delta_positive']}/{group_a_results[f'{label}_on_{hx_id}']['n_delta_negative']})", flush=True)
 
-    # Group B: BIWM-full
     print("\n=== Group B G2: BIWM-full stacking on 5 non-H0 base ===", flush=True)
     group_b_results: dict[str, dict] = {}
     for hx_id in ("H1_structured", "H2_risk_gated", "H3_repair_heavy",
@@ -270,7 +251,7 @@ def main(out_dir: str) -> int:
                     biwm_belief = _read_last_belief(log_path)
                     total_new += 1
                     total_tokens += s["total_tokens"]
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     crashed.append({"stage": "biwm_B", "hid": hx_id,
                                     "task_id": task["task_id"], "error": str(e)})
                     print(f"  [CRASH] BIWMfull {hx_id} {task['task_id']}: {e}", flush=True)
@@ -307,7 +288,6 @@ def main(out_dir: str) -> int:
         }
         print(f"  BIWMfull on {hx_id:<28s} n={len(per)}  D_base={m_base:.3f}  D_full={m_full:.3f}  Δ={m_full-m_base:+.3f}  (+/-: {group_b_results[hx_id]['n_delta_positive']}/{group_b_results[hx_id]['n_delta_negative']})", flush=True)
 
-    # ============== Stage 3: post-hoc Group C alignment ==============
     print("\n=== Group C G2: BIWM-6/7 cross-harness alignment (post-hoc) ===", flush=True)
     align_records: list[dict] = []
     for task in tasks:
@@ -350,7 +330,6 @@ def main(out_dir: str) -> int:
             v = group_c[f"K{K}"]
             print(f"  K={K}: n={v['n']}  D_base={v['D_baseline_5pair_mean']:.3f}  D_aligned={v['D_H0_vs_aligned_mean']:.3f}  Δ={v['delta_mean']:+.3f}  cat_disagree={v['categorical_disagreement_mean']:.2f}", flush=True)
 
-    # ----- Final summary -----
     elapsed = time.time() - t0
     overall = {
         "phase": "DAY6_G2_TerminalBench",

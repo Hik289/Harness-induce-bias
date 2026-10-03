@@ -1,30 +1,3 @@
-"""Phase-1 Table 1 — descriptive (pilot / mechanism study) version.
-
-Per human-researcher decision 2026-06-11 02:29 UTC (branch c3):
-- Phase 1 is recast as a pilot / mechanism study.
-- Statistical inference (p-values, Bonferroni, bootstrap CI, Cohen's d) is
-  removed from all Phase-1 outputs and deferred to Phase 2 on public
-  benchmarks.
-- This script reads the per-row CSV produced by phase1_table1.py and emits a
-  descriptive markdown document with means, K-trend arrows, and a brief
-  mechanism summary for the paper §17 Table 1 candidate.
-
-Editorial decisions:
-- All 5 H0-vs-Hx pairs are reported with their numbers, **no framing words**
-  like "backfire", "negative", "falsified", or "unexpected". Trend arrows are
-  mechanical: ↑ if D(K=8) > D(K=1) + 0.005, ↓ if D(K=8) < D(K=1) - 0.005,
-  → otherwise. This is the minimum bar for a descriptive Phase-1 table that
-  does not selectively omit harness pairs (see ds push-back to Director
-  2026-06-11 02:32 UTC; default = report all, internal interpretation kept
-  in `analysis/internal/h3_h5_polarity_internal.md`).
-- H2 censorship on toy_007 is reported as a brief mechanism case study with
-  P(success) gap by K, no significance testing.
-- The "scope" footer states that statistical validation is deferred to
-  Phase 2 on public benchmarks (G2 family).
-
-Run:
-    python3 analysis/phase1_table1_descriptive.py
-"""
 from __future__ import annotations
 
 import csv
@@ -34,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV_PATH = ROOT / "analysis" / "phase1_table1.csv"
-JSON_PATH = ROOT / "analysis" / "phase1_results.json"  # has H2 raw audit
+JSON_PATH = ROOT / "analysis" / "phase1_results.json"
 OUT_MD = ROOT / "analysis" / "phase1_table1_descriptive.md"
 OUT_INTERNAL = ROOT / "analysis" / "internal" / "h3_h5_polarity_internal.md"
 
@@ -42,7 +15,7 @@ H0 = "H0_raw"
 H_TARGETS = ["H1_structured", "H2_risk_gated", "H3_repair_heavy",
              "H4_verification_selective", "H5_cost_aware"]
 KS = [1, 3, 5, 8]
-TREND_THRESHOLD = 0.005  # |Δ| below this is rendered as →
+TREND_THRESHOLD = 0.005
 
 
 def short(h: str) -> str:
@@ -80,7 +53,6 @@ def load_csv_rows() -> list[dict]:
 
 
 def aggregate(rows: list[dict]) -> dict:
-    """{(hb, K): {D_arrival_mean, D_growth_mean, D_belief_mean, n}}."""
     agg = {}
     for hb in H_TARGETS:
         for k in KS:
@@ -114,7 +86,6 @@ def render_md(agg, h2_audit):
     md.append("(paper §16.1 headline), the arrival floor $D_{\\mathrm{arrival}}$, and the growth-axis\n")
     md.append("$D_{\\mathrm{growth}}$. Trend column compares K=1 vs K=8 means.\n\n")
 
-    # Scalar
     md.append("### 1.1 $D_{\\mathrm{belief}}$ scalar by horizon $K$\n\n")
     md.append("| pair | K=1 | K=3 | K=5 | K=8 | K=1 → K=8 |\n")
     md.append("| --- | ---: | ---: | ---: | ---: | :---: |\n")
@@ -125,7 +96,6 @@ def render_md(agg, h2_audit):
                   f"{d[5]:.3f} | {d[8]:.3f} | {t} |\n")
     md.append("\n")
 
-    # Arrival
     md.append("### 1.2 $D_{\\mathrm{arrival}}$ (on-arrival shift) by horizon $K$\n\n")
     md.append("Components: `set_distance` + `action_mismatch`. Captures divergence present immediately at K=1 due to harness prompt-context rewrites.\n\n")
     md.append("| pair | K=1 | K=3 | K=5 | K=8 | K=1 → K=8 |\n")
@@ -137,7 +107,6 @@ def render_md(agg, h2_audit):
                   f"{d[5]:.3f} | {d[8]:.3f} | {t} |\n")
     md.append("\n")
 
-    # Growth
     md.append("### 1.3 $D_{\\mathrm{growth}}$ (K-amplification axis) by horizon $K$\n\n")
     md.append("Components: `cat_mismatch` + `failure_mode_mismatch` + `num_distance`. The sub-scalar the H0 hypothesis is loaded on (METRICS_SPEC §10.4).\n\n")
     md.append("| pair | K=1 | K=3 | K=5 | K=8 | K=1 → K=8 |\n")
@@ -149,7 +118,6 @@ def render_md(agg, h2_audit):
                   f"{d[5]:.3f} | {d[8]:.3f} | {t} |\n")
     md.append("\n")
 
-    # Per-pair sentence summary (mechanical, no framing)
     md.append("## 2. Per-pair sentence summary (mechanical readout from §1.3)\n\n")
     for hb in H_TARGETS:
         d = {k: agg[(hb, k)]["D_growth_mean"] for k in KS}
@@ -159,7 +127,6 @@ def render_md(agg, h2_audit):
         md.append(f"  K=8: $D_{{\\mathrm{{growth}}}} = {d[8]:.3f}$ (trend K=1→K=8: {trend(d[1], d[8])}).\n")
     md.append("\n")
 
-    # H2 toy_007 mechanism vignette
     md.append("## 3. H2 blocked-branch mechanism vignette — toy_007\n\n")
     md.append("`toy_007_destructive_action_trap` is the task designed to trigger H2's risk-gate.\n")
     md.append("This pair (H0 vs H2) on this single task shows a textbook blocked-branch effect:\n")
@@ -185,7 +152,6 @@ def render_md(agg, h2_audit):
     g = h2_audit["p_success_gap_H2_minus_H0_by_K"]
     md.append(f"The gap rises from K=1 ({g['1']:+.2f}) to K=5 ({g['5']:+.2f}) and then closes at K=8 ({g['8']:+.2f}).\n\n")
 
-    # Mechanism summary (single paragraph)
     md.append("## 4. Mechanism summary (paragraph form)\n\n")
     md.append("The five H0-vs-Hx pairs span an arrival floor of $D_{\\mathrm{arrival}} \\approx 0.99$ "
               "across all K and all pairs: each non-trivial harness immediately rewrites the constraint "
@@ -199,7 +165,6 @@ def render_md(agg, h2_audit):
               "*descriptive*; statistical validation is deferred to Phase 2 on public benchmarks "
               "(see §5).\n\n")
 
-    # Scope
     md.append("## 5. Scope of this document\n\n")
     md.append("- **Pilot / mechanism study only.** Phase-1 is reframed (human researcher decision "
               "2026-06-11 02:29 UTC) as a pilot exploration on the v0_toy benchmark; statistical "
@@ -226,12 +191,6 @@ def render_md(agg, h2_audit):
 
 
 def render_internal_notes(agg):
-    """Internal-only mechanism notes for the 5-pair K-trend pattern.
-
-    Not for paper. Lives under `analysis/internal/` so future ds (or theorist
-    on a follow-up) can see what the K=1→K=8 numbers do *across* harnesses
-    without losing the audit trail.
-    """
     OUT_INTERNAL.parent.mkdir(parents=True, exist_ok=True)
     md = []
     md.append("# Internal notes — Phase-1 K-trend pattern across 5 harness pairs\n\n")

@@ -1,4 +1,3 @@
-"""HIBench-Code v0 toy task loader."""
 from __future__ import annotations
 
 import json
@@ -8,14 +7,12 @@ from typing import Optional
 DEFAULT_TASKS_PATH = Path(
     "./data/hibench_code/v0_toy/tasks.json"
 )
-# 在 hpc 上的镜像位置
 HPC_TASKS_PATH = Path(
     "./data/hibench_code/v0_toy/tasks.json"
 )
 
 
 def load_tasks(path: Optional[str | Path] = None) -> list[dict]:
-    """加载 v0_toy 任务列表; 优先用显式 path, 其次 GCP, 再 hpc 镜像."""
     candidates: list[Path] = []
     if path is not None:
         candidates.append(Path(path))

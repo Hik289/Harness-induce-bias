@@ -1,17 +1,3 @@
-"""Day 5 extension: Group A + Group B at n=24 (8 task × 3 seed × K=5).
-
-复用已有 anchor5_biwm_smoke 的 30 个 jsonl (3 task × 5 wrapper × seed=42 +
-3 task × 5 BIWMfull × seed=42), 只跑剩余 cells.
-
-Group A: BIWM-{1,2,3,4,5} wrapper × {pair: H1/H2/H3/H4/H5} × 8 task × 3 seed × K=5
-Group B: BIWM-full(Hx) × Hx ∈ {H1,...,H5} × 8 task × 3 seed × K=5
-
-每个 BIWM 跑完后, 从 Phase 1 主表读 D_base = D(H0_K5_seed, Hx_K5_seed), 然后
-读 BIWM jsonl 的 belief_K = D(H0_K5_seed, BIWM(Hx)_K5_seed). 计算 ΔD per task
-+ 5 分量.
-
-Director 派单要求只做描述性, 不算 p 值; 报 mean / per-task delta / 5 分量.
-"""
 from __future__ import annotations
 
 import argparse
@@ -29,16 +15,16 @@ for _p in (str(_EXPERIMENTS.parent), str(_SKELETON), str(_EXPERIMENTS)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from skeleton.benchmark.hibench_loader import load_tasks  # noqa: E402
-from skeleton.core.jsonl_logger import JSONLLogger  # noqa: E402
-from skeleton.core.llm_client import LLMClient  # noqa: E402
-from skeleton.core.rollout import run_kstep_rollout  # noqa: E402
-from skeleton.harnesses import HARNESS_REGISTRY  # noqa: E402
-from skeleton.biwm import (  # noqa: E402
+from skeleton.benchmark.hibench_loader import load_tasks
+from skeleton.core.jsonl_logger import JSONLLogger
+from skeleton.core.llm_client import LLMClient
+from skeleton.core.rollout import run_kstep_rollout
+from skeleton.harnesses import HARNESS_REGISTRY
+from skeleton.biwm import (
     CanonicalBeliefWrapper, BlockedActionLogWrapper, RepairUnrolledWrapper,
     VerificationMaskWrapper, ShadowExecutionWrapper, biwm_full,
 )
-from metrics.d_belief import d_belief_components  # noqa: E402
+from metrics.d_belief import d_belief_components
 
 JST = timezone(timedelta(hours=9))
 
@@ -59,11 +45,10 @@ def _read_phase1(p1: Path, hid: str, tid: str, K: int, seed: int):
         return None
     try:
         return _read_last_belief(f)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
-# Group A mapping (component label, pair Hx, wrapper_cls)
 GROUP_A = [
     ("BIWM1_canonical", "H1_structured", CanonicalBeliefWrapper),
     ("BIWM2_blocked_log", "H2_risk_gated", BlockedActionLogWrapper),
@@ -90,20 +75,17 @@ def main(out_dir: str, reuse_dir: str, phase1_dir: str, K: int, seeds: list[int]
     total_reused = 0
     total_tokens = 0
 
-    # ----- Group A -----
     print("\n=== Group A (extended): single-component wrappers ===", flush=True)
     group_a_results = {}
     for label, hx_id, wrapper_cls in GROUP_A:
         per = []
         for task in tasks:
             for seed in seeds:
-                # baselines from phase1
                 b0 = _read_phase1(phase1, "H0_raw", task["task_id"], K, seed)
                 bx_base = _read_phase1(phase1, hx_id, task["task_id"], K, seed)
                 if b0 is None or bx_base is None:
                     print(f"  skip {label} {task['task_id']} seed{seed}: missing phase1 belief", flush=True)
                     continue
-                # BIWM rollout: reuse if exists in `reuse` (anchor5_biwm_smoke), else new run in `out`
                 fname = f"{label}_on_{hx_id}_{hx_id}_{task['task_id']}_K{K}_seed{seed}.jsonl"
                 reuse_path = reuse / fname
                 out_path = out / fname
@@ -128,7 +110,7 @@ def main(out_dir: str, reuse_dir: str, phase1_dir: str, K: int, seeds: list[int]
                         biwm_tokens = summary["total_tokens"]
                         total_tokens += biwm_tokens
                         total_new += 1
-                    except Exception as e:  # noqa: BLE001
+                    except Exception as e:
                         print(f"  CRASH {label} {task['task_id']} seed{seed}: {e}", flush=True)
                         continue
 
@@ -148,7 +130,6 @@ def main(out_dir: str, reuse_dir: str, phase1_dir: str, K: int, seeds: list[int]
             continue
         m_base = statistics.fmean(p["D_baseline"] for p in per)
         m_biwm = statistics.fmean(p["D_biwm"] for p in per)
-        # SE of paired delta
         deltas = [p["delta_D"] for p in per]
         s_delta = statistics.pstdev(deltas) if len(deltas) > 1 else 0.0
         group_a_results[f"{label}_on_{hx_id}"] = {
@@ -165,7 +146,6 @@ def main(out_dir: str, reuse_dir: str, phase1_dir: str, K: int, seeds: list[int]
         }
         print(f"  {label:<22s} on {hx_id:<28s} n={len(per)}  D_base={m_base:.3f}  D_biwm={m_biwm:.3f}  Δ={m_biwm-m_base:+.3f} (std={s_delta:.3f}, +/-: {group_a_results[f'{label}_on_{hx_id}']['n_delta_positive']}/{group_a_results[f'{label}_on_{hx_id}']['n_delta_negative']})", flush=True)
 
-    # ----- Group B -----
     print("\n=== Group B (extended): BIWM-full stacks ===", flush=True)
     group_b_results = {}
     for hx_id in ("H1_structured", "H2_risk_gated", "H3_repair_heavy",
@@ -197,7 +177,7 @@ def main(out_dir: str, reuse_dir: str, phase1_dir: str, K: int, seeds: list[int]
                         biwm_belief = _read_last_belief(out_path)
                         total_tokens += summary["total_tokens"]
                         total_new += 1
-                    except Exception as e:  # noqa: BLE001
+                    except Exception as e:
                         print(f"  CRASH BIWMfull {hx_id} {task['task_id']} seed{seed}: {e}", flush=True)
                         continue
                 d_base = d_belief_components(b0, bx_base)

@@ -1,28 +1,3 @@
-"""BIWM Group A/B/C v1.1 (D_arrival + D_growth) recompute, descriptive.
-
-Inputs:
-  - experiments/logs/day5_biwm_extend/BIWM{1..5}_*_K5_seed*.jsonl   (Group A)
-  - experiments/logs/day5_biwm_extend/BIWMfull_H{1..5}_*_K5_seed*.jsonl  (Group B)
-  - experiments/logs/phase1_main/*.jsonl  (Group C aligned, n=96, all K)
-  - Baseline (Naive) D values for H0 vs Hx come from phase1_main jsonls
-    (final-step belief), same convention as analysis/phase1_table1.py.
-
-Outputs:
-  analysis/biwm_group_A_v2.md
-  analysis/biwm_group_B_v2.md
-  analysis/biwm_group_C_v2.md
-  analysis/biwm_table2_descriptive.md
-  analysis/biwm_v2_raw.json   (machine-readable consolidated dump)
-
-All numbers are descriptive only: means, std, K-trend arrows. No p-values,
-no Bonferroni, no bootstrap CI, no Cohen's d. Per human-researcher 2026-06-11
-decision (branch c3).
-
-Reproducibility: deterministic, single pass over the logs. No RNG.
-
-Run:
-    python3 analysis/biwm_v2_recompute.py
-"""
 from __future__ import annotations
 
 import json
@@ -36,26 +11,23 @@ EXP = ROOT / "experiments"
 sys.path.insert(0, str(EXP / "skeleton"))
 sys.path.insert(0, str(EXP))
 
-from metrics.d_belief import (  # noqa: E402
+from metrics.d_belief import (
     ARRIVAL_GROUP_WEIGHT, GROWTH_GROUP_WEIGHT,
     d_belief_decomposition,
 )
-from core.belief_schema import validate_belief  # noqa: E402
+from core.belief_schema import validate_belief
 
-# Load align_beliefs directly to avoid the biwm/__init__.py relative-import
-# chain (which depends on harness_base from the skeleton package, not needed
-# for the pure-function reducer).
-import importlib.util as _ilu  # noqa: E402
+import importlib.util as _ilu
 _align_spec = _ilu.spec_from_file_location(
     "_cross_harness_align",
     str(EXP / "skeleton" / "biwm" / "cross_harness_align.py"),
 )
 _align_mod = _ilu.module_from_spec(_align_spec)
 _align_spec.loader.exec_module(_align_mod)
-align_beliefs = _align_mod.align_beliefs  # noqa: E402
+align_beliefs = _align_mod.align_beliefs
 
 DAY5_DIR = EXP / "logs" / "day5_biwm_extend"
-DAY4_BIWM_DIR = EXP / "logs" / "anchor5_biwm_smoke"  # Day-4 originals, reused
+DAY4_BIWM_DIR = EXP / "logs" / "anchor5_biwm_smoke"
 PHASE1_DIR = EXP / "logs" / "phase1_main"
 OUT_DIR = ROOT / "analysis"
 
@@ -85,31 +57,10 @@ FULL_HARNESSES = [
 ]
 H0 = "H0_raw"
 
-TREND_THRESHOLD = 0.005  # for K-trend arrows on Group C
+TREND_THRESHOLD = 0.005
 
 
-# -------- IO helpers --------------------------------------------------------
 def load_final_belief(path: Path) -> dict | None:
-    """Load the final-step belief_output from a step jsonl.
-
-    Data-quality policy (Day 5 BIWM recompute):
-
-    - On Phase-1 main jsonls (`phase1_main/*.jsonl`), `schema_fail=True` is
-      reliable: 0 cases (100% schema pass per ml_eng SETUP_DAY3 §0).
-    - On Day-5 BIWM extension jsonls (`day5_biwm_extend/*.jsonl`), the
-      writer's `schema_fail` flag is set on 55 / 225 cells, but those same
-      55 belief_outputs **pass the canonical `validate_belief(...)` check**
-      (verified by an independent sweep). The writer flag appears to use
-      a stricter local validation than the canonical METRICS_SPEC §2 schema.
-    - **Decision**: trust the canonical schema (`validate_belief`) as the
-      single source of truth, per METRICS_SPEC §2. Records that pass
-      `validate_belief` are loaded regardless of the writer's `schema_fail`
-      flag. Records that genuinely fail `validate_belief` (none in the
-      current dataset) would still be dropped. `llm_error != None` records
-      are always dropped (the LLM call failed).
-    - This decision is logged in `biwm_table2_descriptive.md` §6 and the
-      raw JSON dump `biwm_v2_raw.json`.
-    """
     if not path.exists():
         return None
     text = path.read_text()
@@ -128,7 +79,6 @@ def load_final_belief(path: Path) -> dict | None:
         return None
     if step.get("llm_error"):
         return None
-    # Canonical schema check (METRICS_SPEC §2) — overrides the writer's flag.
     errs = validate_belief(bo)
     if errs:
         return None
@@ -136,16 +86,10 @@ def load_final_belief(path: Path) -> dict | None:
 
 
 def biwm_path(wrapper_prefix: str, task: str, seed: int) -> Path:
-    # day5 files use double-underscore harness naming
     return DAY5_DIR / f"{wrapper_prefix}_{wrapper_prefix.split('_on_')[-1] if '_on_' in wrapper_prefix else ''}_{task}_K5_seed{seed}.jsonl"
 
 
 def biwm_a_path(wrapper: str, task: str, seed: int) -> Path:
-    """Group A files use the convention `BIWM1_canonical_on_H1_structured_H1_structured_<task>_K5_seed<s>.jsonl`.
-
-    Falls back to anchor5_biwm_smoke/ (Day-4 originals) if the day5_biwm_extend
-    file is absent — same naming convention there.
-    """
     base_h = wrapper.split("_on_")[-1]
     fname = f"{wrapper}_{base_h}_{task}_K5_seed{seed}.jsonl"
     p = DAY5_DIR / fname
@@ -155,13 +99,6 @@ def biwm_a_path(wrapper: str, task: str, seed: int) -> Path:
 
 
 def biwm_full_path(full_h: str, task: str, seed: int) -> Path:
-    """Group B files use the convention `BIWMfull_H1_structured_<task>_K5_seed<s>.jsonl`.
-
-    Falls back to anchor5_biwm_smoke/ (Day-4 originals) if the day5_biwm_extend
-    file is absent — same naming convention. Three (toy, seed=42) cells per
-    base harness are only present in the Day-4 directory; SETUP_DAY5 §0 says
-    Day-5 reused 15 cells, so this fallback closes that gap.
-    """
     fname = f"{full_h}_{task}_K5_seed{seed}.jsonl"
     p = DAY5_DIR / fname
     if p.exists():
@@ -173,21 +110,7 @@ def phase1_path(harness: str, task: str, K: int, seed: int) -> Path:
     return PHASE1_DIR / f"{harness}_{task}_K{K}_seed{seed}.jsonl"
 
 
-# -------- Group A / B: BIWM wrappers vs Naive (H0 vs target harness, K=5) ---
 def group_A_recompute() -> dict:
-    """For each BIWM wrapper-on-Hx vs H0 at K=5, n=24 (8 task × 3 seed).
-
-    Compute:
-      D_arrival_baseline_mean: mean over 24 of D_arrival(H0_K5, Hx_K5)
-      D_growth_baseline_mean:  mean over 24 of D_growth(H0_K5, Hx_K5)
-      D_belief_baseline_mean:  scalar
-      D_arrival_biwm_mean:     mean over 24 of D_arrival(H0_K5, BIWM(Hx)_K5)
-      D_growth_biwm_mean:      mean over 24 of D_growth(...)
-      D_belief_biwm_mean:      scalar
-      delta_D_arrival, delta_D_growth, delta_D_belief = biwm − baseline
-      per-component delta means
-      n_delta_positive / n_delta_negative for D_belief / D_arrival / D_growth
-    """
     out = {}
     for wrapper, base_h in WRAPPERS:
         cells_baseline = []
@@ -201,7 +124,6 @@ def group_A_recompute() -> dict:
         n_missing = 0
         for task in TASKS:
             for seed in SEEDS:
-                # baseline: H0 vs Hx, K=5 (Phase 1 main)
                 bo_h0 = load_final_belief(phase1_path(H0, task, 5, seed))
                 bo_hx = load_final_belief(phase1_path(base_h, task, 5, seed))
                 bo_biwm = load_final_belief(biwm_a_path(wrapper, task, seed))
@@ -314,17 +236,7 @@ def group_B_recompute() -> dict:
     return out
 
 
-# -------- Group C: cross-harness alignment over Phase-1 main (post-hoc) -----
 def group_C_recompute() -> dict:
-    """For each (task, K, seed), align 5 non-H0 belief outputs into 1 aligned
-    belief, then compare against H0 with v1.1 decomposition.
-
-    Two scalars reported:
-      mean_D(H0, Hx)_v11: mean over 5 non-H0 pairs of {D_belief, D_arrival, D_growth}
-      D(H0, aligned)_v11: same triple, against the aligned belief
-      gap = aligned − mean(Hx)
-    aggregated per K (n=24 = 8 tasks × 3 seeds), and overall (n=96).
-    """
     per_K = {K: {"mean_D_belief_Hx": [], "mean_D_arrival_Hx": [],
                  "mean_D_growth_Hx": [],
                  "D_belief_aligned": [], "D_arrival_aligned": [],
@@ -342,7 +254,6 @@ def group_C_recompute() -> dict:
                 if bo_h0 is None or len(bo_views) < 2:
                     n_missing += 1
                     continue
-                # mean per-pair against H0
                 d_each = [d_belief_decomposition(bo_h0, b) for b in bo_views]
                 per_K[K]["mean_D_belief_Hx"].append(
                     statistics.fmean(d["D_belief"] for d in d_each))
@@ -350,7 +261,6 @@ def group_C_recompute() -> dict:
                     statistics.fmean(d["D_arrival"] for d in d_each))
                 per_K[K]["mean_D_growth_Hx"].append(
                     statistics.fmean(d["D_growth"] for d in d_each))
-                # aligned belief
                 aligned = align_beliefs(bo_views)
                 d_align = d_belief_decomposition(bo_h0, aligned)
                 per_K[K]["D_belief_aligned"].append(d_align["D_belief"])
@@ -393,7 +303,6 @@ def group_C_recompute() -> dict:
     return summary
 
 
-# -------- markdown renderers ------------------------------------------------
 def render_group_A(A: dict, out_path: Path):
     md = []
     md.append("# BIWM Group A — single-component wrappers, v1.1 recompute\n\n")
@@ -794,7 +703,6 @@ def render_table2(A: dict, B: dict, C: dict, out_path: Path):
     out_path.write_text("".join(md))
 
 
-# -------- main --------------------------------------------------------------
 def main() -> int:
     print("[group A] recomputing 5 wrappers × 24 cells ...")
     A = group_A_recompute()
@@ -803,7 +711,6 @@ def main() -> int:
     print("[group C] recomputing aligned beliefs × 96 cells ...")
     C = group_C_recompute()
 
-    # Consolidated JSON
     raw = {
         "metric_version": "v1.1",
         "phase": "Day 5 — pilot / mechanism study (c3)",
@@ -818,7 +725,6 @@ def main() -> int:
     render_group_C(C, OUT_DIR / "biwm_group_C_v2.md")
     render_table2(A, B, C, OUT_DIR / "biwm_table2_descriptive.md")
 
-    # Print a short summary line for the orchestrating shell.
     summary = {
         "group_A_wrappers": list(A.keys()),
         "group_A_n_per_wrapper": [A[w]["n"] for w, _ in WRAPPERS],

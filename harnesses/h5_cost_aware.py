@@ -1,14 +1,3 @@
-"""H5 Cost-Aware Harness (readme §8 H5 + §10.1 H0 vs H5 expected K=5 high divergence).
-
-与 H0 Raw 的核心差异 (prompt-side, 必须是 LLM 看得见的差异):
-- observation 被**截断**到 cost budget: 长输出 (test log 等) 被 summary 替换;
-  raw_text 上面附 "[BUDGET=low] omitted ~N chars" 标注; LLM 看见 budget 标注
-  应当主动节省后续 verifier 调用, 但实测往往会让 belief 过自信 (因为关键
-  细节被砍掉)
-- 显式 metadata: "verifier 因 cost 跳过", "expensive observation 已截断", 
-  "重型 LLM review 已禁用"
-- verifier 几乎不跑 (random 1/3 概率跑 cheap)
-"""
 from __future__ import annotations
 
 import hashlib
@@ -32,7 +21,7 @@ _BUDGET_HEADER = (
     "  请用低置信度估计 task_progress."
 )
 
-_OBS_CHAR_BUDGET = 200  # 字符上限
+_OBS_CHAR_BUDGET = 200
 
 
 def _truncate(text: str, n: int) -> tuple[str, int]:
@@ -44,7 +33,6 @@ def _truncate(text: str, n: int) -> tuple[str, int]:
 
 
 def _step_runs_verifier(step: int, task: dict) -> bool:
-    """每 3 步跑 1 次 cheap verifier; 用 task_id+step 决定 (deterministic)."""
     key = (task.get("task_id", "") + f"_step{step}").encode("utf-8")
     h = int.from_bytes(hashlib.sha1(key).digest()[:4], "big")
     return (h % 3) == 0
@@ -104,7 +92,6 @@ class H5CostAwareHarness(Harness):
         )
 
     def run_verifier(self, task, step, action) -> VerificationResult:
-        # 不跑 verifier 除非 deterministic hash 命中
         if _step_runs_verifier(step, task):
             return VerificationResult(
                 verified=False, verifier_type="cheap",

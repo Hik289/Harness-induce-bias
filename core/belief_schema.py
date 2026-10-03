@@ -1,17 +1,9 @@
-"""Belief / log JSON schema (readme §9.1 + §15).
-
-The Draft 2020-12 schema provides a stable interface for the D_belief, ECE,
-and AUROC analyses. Enumerated belief-state fields follow README Section 9.1,
-all probabilities lie in ``[0, 1]``, and the ``extras`` objects permit
-analysis-specific metadata without weakening validation of required fields.
-"""
 from __future__ import annotations
 
 from typing import Any
 import jsonschema
 
 
-# -- belief_state ---------------------------------------------------
 TASK_PROGRESS_ENUM = ["none", "weak", "partial", "strong", "complete"]
 RISK_STATE_ENUM = ["low", "medium", "high"]
 RECOVERABILITY_ENUM = ["high", "medium", "low"]
@@ -52,7 +44,6 @@ BELIEF_STATE_SCHEMA: dict[str, Any] = {
     "additionalProperties": True,
 }
 
-# -- predicted_future -----------------------------------------------
 PREDICTED_FUTURE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": [
@@ -79,7 +70,6 @@ PREDICTED_FUTURE_SCHEMA: dict[str, Any] = {
     "additionalProperties": True,
 }
 
-# -- next_action_recommendation -------------------------------------
 NEXT_ACTION_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": ["action", "reason", "verification_target"],
@@ -91,7 +81,6 @@ NEXT_ACTION_SCHEMA: dict[str, Any] = {
     "additionalProperties": True,
 }
 
-# -- top-level belief output ----------------------------------------
 BELIEF_OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": ["belief_state", "predicted_future", "next_action_recommendation"],
@@ -103,7 +92,6 @@ BELIEF_OUTPUT_SCHEMA: dict[str, Any] = {
     "additionalProperties": True,
 }
 
-# -- step log (readme §15) -------------------------------------------
 STEP_LOG_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": [
@@ -162,7 +150,6 @@ STEP_LOG_SCHEMA: dict[str, Any] = {
         },
         "shadow_execution": {"type": "object"},
         "downstream_result": {"type": "object"},
-        # 实际跑会附加的字段
         "timestamp_jst": {"type": "string"},
         "run_id": {"type": "string"},
         "llm_stats": {"type": "object"},
@@ -177,7 +164,6 @@ _step_validator = jsonschema.Draft202012Validator(STEP_LOG_SCHEMA)
 
 
 def validate_belief(obj: Any) -> list[str]:
-    """返回 error message 列表; 空表示通过."""
     return [f"{'/'.join(map(str, e.path))}: {e.message}" for e in _belief_validator.iter_errors(obj)]
 
 
@@ -186,7 +172,6 @@ def validate_step_log(obj: Any) -> list[str]:
 
 
 def empty_belief_output(horizon: int = 0) -> dict:
-    """生成一个 schema-valid 的空 belief (供 fallback / 测试用)."""
     return {
         "belief_state": {
             "task_progress": "none",

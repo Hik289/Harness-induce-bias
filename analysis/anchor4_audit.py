@@ -1,15 +1,3 @@
-"""anchor_4 audit — paired t-test + Cohen's d + bootstrap CI + component decomposition.
-
-Reads experiments/logs/anchor4_phase1_smoke/anchor4_summary.json (which already
-contains the precomputed D_belief per task per K, with the 5-component
-breakdown) plus the underlying step-JSONLs (one per (harness, task, K)) so we
-can independently recompute D_belief from the raw belief_outputs.
-
-Outputs analysis/anchor4_audit.md (this script's companion).
-
-Run:
-    python3 analysis/anchor4_audit.py
-"""
 from __future__ import annotations
 
 import json
@@ -25,7 +13,7 @@ EXP = ROOT / "experiments"
 sys.path.insert(0, str(EXP / "skeleton"))
 sys.path.insert(0, str(EXP))
 
-from metrics.d_belief import (  # noqa: E402
+from metrics.d_belief import (
     ARRIVAL_GROUP_WEIGHT, GROWTH_GROUP_WEIGHT,
     d_belief_components, d_belief_decomposition,
 )
@@ -37,7 +25,6 @@ OUT_JSON = ROOT / "analysis" / "anchor4_audit.json"
 
 
 def load_belief(path: Path) -> list[dict]:
-    """Return list of belief_output dicts from a step JSONL (one per step)."""
     out: list[dict] = []
     for line in path.read_text().splitlines():
         if not line.strip():
@@ -51,26 +38,10 @@ def load_belief(path: Path) -> list[dict]:
 
 
 def recompute_D(h0_jsonl: Path, h2_jsonl: Path) -> tuple[float, dict[str, float]]:
-    """Recompute D_belief(K) + decomposition for a (task, K) pair from raw JSONLs.
-
-    Semantic (matches ml_engineer's anchor4_summary.json):
-        D(K) is computed on the *final-step* belief_output of each
-        rollout (i.e. step == rollout_horizon, the K-step imagined-future
-        endpoint). This is the right semantic for the H0 hypothesis
-        ("LLM rollout compounds belief differences over K"): the K=1 belief
-        is the 1-step-ahead imagination; the K=5 belief is the 5-step-ahead
-        imagination. Averaging across intermediate steps would dilute the
-        K-step amplification signal.
-
-    Returns (D_belief, full_decomposition_dict) where the dict contains
-    D_belief, D_arrival, D_growth, the 5 component scores, and group masses.
-    """
     a = load_belief(h0_jsonl)
     b = load_belief(h2_jsonl)
     if not a or not b:
         return float("nan"), {}
-    # The final step in the JSONL is the K-step rollout endpoint.
-    # v1.1: full decomposition (scalar + arrival + growth + 5 components).
     return (
         d_belief_components(a[-1], b[-1])["D_belief"],
         d_belief_decomposition(a[-1], b[-1]),
@@ -84,18 +55,15 @@ def paired_t(deltas: list[float]) -> dict[str, float]:
         return {"n": n, "mean": mean, "sd": float("nan"), "t": float("nan"),
                 "df": n - 1, "p_two_sided": float("nan"),
                 "p_one_sided_greater": float("nan")}
-    sd = statistics.stdev(deltas)  # sample SD
+    sd = statistics.stdev(deltas)
     se = sd / math.sqrt(n)
     t = mean / se if se > 0 else float("inf")
     df = n - 1
-    # student-t CDF via scipy if available, else fall back to Wilson-Hilferty
     try:
-        from scipy.stats import t as student_t  # noqa: WPS433
+        from scipy.stats import t as student_t
         p_two = 2 * (1 - student_t.cdf(abs(t), df))
         p_one = 1 - student_t.cdf(t, df)
     except Exception:
-        # Coarse fallback (still correct to ~1e-3 for df>=4)
-        # use normal approximation
         from math import erf, sqrt
         p_two = 2 * (1 - 0.5 * (1 + erf(abs(t) / sqrt(2))))
         p_one = 1 - 0.5 * (1 + erf(t / sqrt(2)))
@@ -139,7 +107,6 @@ def main() -> int:
     summary = json.loads(SUMMARY.read_text())
     tasks = summary["tasks"]
 
-    # ---- raw audit: recompute D_belief from JSONLs and compare to summary ----
     audit_rows = []
     for t in tasks:
         h0_K1 = LOG_DIR.parent.parent / t["H0_raw_K1_log"]
@@ -148,7 +115,6 @@ def main() -> int:
         h2_K3 = LOG_DIR.parent.parent / t["H2_risk_gated_K3_log"]
         D_K1_recomp, comps_K1 = recompute_D(h0_K1, h2_K1)
         D_K3_recomp, comps_K3 = recompute_D(h0_K3, h2_K3)
-        # v1.1 identity sanity-check per task
         ident_K1 = (
             ARRIVAL_GROUP_WEIGHT * comps_K1.get("D_arrival", 0)
             + GROWTH_GROUP_WEIGHT * comps_K1.get("D_growth", 0)
@@ -167,7 +133,6 @@ def main() -> int:
             "delta_recomp": D_K3_recomp - D_K1_recomp,
             "comps_K1": comps_K1,
             "comps_K3": comps_K3,
-            # v1.1 decomposition
             "D_arrival_K1": comps_K1.get("D_arrival"),
             "D_arrival_K3": comps_K3.get("D_arrival"),
             "D_growth_K1": comps_K1.get("D_growth"),
@@ -181,7 +146,6 @@ def main() -> int:
             "identity_residual_K3": abs(ident_K3 - D_K3_recomp),
         })
 
-    # ---- consistency check: summary vs recomp ----
     max_abs_d_diff = max(
         abs(r["D_K1_summary"] - r["D_K1_recomp"]) for r in audit_rows
     ) if audit_rows else 0
@@ -191,25 +155,21 @@ def main() -> int:
         if audit_rows else 0,
     )
 
-    # ---- stats on deltas (D_K3 - D_K1) — scalar ----
     deltas = [r["delta_recomp"] for r in audit_rows]
     t_res = paired_t(deltas)
     d_eff = cohens_d_paired(deltas)
     boot = bootstrap_paired(deltas, n_boot=10000, seed=42)
 
-    # ---- v1.1: stats on growth-D deltas (the canonical Phase-1 G1 target) ----
     growth_deltas = [r["growth_delta"] for r in audit_rows]
     t_res_growth = paired_t(growth_deltas)
     d_eff_growth = cohens_d_paired(growth_deltas)
     boot_growth = bootstrap_paired(growth_deltas, n_boot=10000, seed=42)
 
-    # ---- v1.1: max identity residual across all 10 (task, K) cells ----
     max_id_residual = max(
         max(r["identity_residual_K1"], r["identity_residual_K3"])
         for r in audit_rows
     )
 
-    # ---- per-component decomposition: which sub-metric grows most? ----
     comp_keys = ["cat_mismatch", "failure_mode_mismatch", "set_distance",
                  "num_distance", "action_mismatch"]
     comp_deltas: dict[str, list[float]] = {k: [] for k in comp_keys}
@@ -227,7 +187,6 @@ def main() -> int:
             "cohens_d": cohens_d_paired(d),
         }
 
-    # ---- write JSON dump ----
     out = {
         "metric_version": "v1.1 (decomposition)",
         "audit_rows": audit_rows,
@@ -264,7 +223,6 @@ def main() -> int:
     }
     OUT_JSON.write_text(json.dumps(out, indent=2, default=float))
 
-    # ---- write markdown ----
     write_markdown(out, audit_rows, t_res, d_eff, boot, comp_stats,
                    max_abs_d_diff, t_res_growth, d_eff_growth, boot_growth,
                    max_id_residual)
@@ -340,7 +298,6 @@ def write_markdown(out, rows, t_res, d_eff, boot, comp_stats, max_diff,
               "  Phase-1 main table (576 runs); this audit is a **dry-run** of the same statistical\n"
               "  machinery on the smoke data.\n\n")
 
-    # ---- v1.1 decomposition block -------------------------------------------
     md.append("## 1b. v1.1 decomposition: $D_{\\mathrm{arrival}}$ vs $D_{\\mathrm{growth}}$ on anchor_4\n\n")
     md.append(f"- Identity $D_\\text{{belief}} = w_A D_\\text{{arrival}} + w_G D_\\text{{growth}}$ holds on all 10 "
               f"`(task, K)` cells with max residual `{max_id_residual:.2e}` "

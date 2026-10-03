@@ -1,36 +1,3 @@
-"""G4 — Risk ECE + Failure-Attractor AUROC + Repair AUROC (descriptive).
-
-Reviewer-driven follow-up: the project checklist listed G4 calibration / AUROC
-indicators but the paper main.pdf does not include them. This script provides
-the descriptive numbers across three benchmarks (Phase-1 HIBench, Day-5 BIWM,
-G2 Terminal-Bench) so the Director can decide whether to add them to a paper
-appendix.
-
-Outcome definitions (declared up-front to be paper-grade auditable):
-
-  Because we are in *imagined* multi-step rollout — no real-environment
-  feedback per readme §10 — there is no environment-grounded outcome. We use
-  **K-step self-consistency outcomes**: the step-0 belief's predictions are
-  scored against the LLM's own final-step (step == K) belief in the same
-  rollout. This is honest about indicator validity and is the right test of
-  the H0 hypothesis "rollout compounds belief differences over K".
-
-  - **success outcome** = (final-step task_progress ∈ {`complete`, `strong`})
-  - **failure-attractor outcome** = (final-step likely_failure_mode ≠ `none`)
-  - **repair-needed outcome** = (any step in the rollout has
-    repair_event.occurred == True)
-
-Predictors (all from the step-0 belief_output):
-
-  - success_probability (`pf.success_probability`) → ECE / Brier vs success_outcome
-  - failure_attractor_probability (`pf.failure_attractor_probability`) → AUROC vs failure_outcome
-  - expected_repair_need (`pf.expected_repair_need`) → AUROC vs repair_outcome
-
-Limitations are noted in every output file §0.
-
-Run:
-    python3 analysis/g4_recompute.py
-"""
 from __future__ import annotations
 
 import itertools
@@ -48,13 +15,13 @@ EXP = ROOT / "experiments"
 sys.path.insert(0, str(EXP / "skeleton"))
 sys.path.insert(0, str(EXP))
 
-from metrics.calibration import ece, brier, calibration_summary  # noqa: E402
-from metrics.auroc import auroc  # noqa: E402
-from core.belief_schema import validate_belief  # noqa: E402
+from metrics.calibration import ece, brier, calibration_summary
+from metrics.auroc import auroc
+from core.belief_schema import validate_belief
 
 PHASE1_DIR = EXP / "logs" / "phase1_main"
 DAY5_DIR = EXP / "logs" / "day5_biwm_extend"
-DAY4_DIR = EXP / "logs" / "anchor5_biwm_smoke"  # Day-4 originals
+DAY4_DIR = EXP / "logs" / "anchor5_biwm_smoke"
 G2_DIR = EXP / "logs" / "g2_terminal_bench"
 OUT_DIR = ROOT / "analysis"
 
@@ -100,7 +67,6 @@ FULL_G2 = [
 
 
 def load_run(path: Path) -> list[dict] | None:
-    """Load all step jsonls; trust canonical schema for belief validity."""
     if not path.exists():
         return None
     text = path.read_text()
@@ -121,7 +87,6 @@ def load_run(path: Path) -> list[dict] | None:
 
 
 def extract_run_features(steps: list[dict]) -> dict:
-    """For a (run, K), pull step-0 predictors and final-step outcomes."""
     step0 = steps[0]["belief_output"]
     last = steps[-1]["belief_output"]
     success_outcome = int(last["belief_state"]["task_progress"]
@@ -141,9 +106,7 @@ def extract_run_features(steps: list[dict]) -> dict:
     }
 
 
-# --------------------------- Phase-1 loader ---------------------------------
 def phase1_runs() -> dict[tuple[str, int], list[dict]]:
-    """Group features by (harness, K). 24 runs per cell (8 task × 3 seed)."""
     out: dict[tuple[str, int], list[dict]] = defaultdict(list)
     for h, t, K, s in itertools.product(HARNESSES, PHASE1_TASKS, PHASE1_KS,
                                          PHASE1_SEEDS):
@@ -156,7 +119,6 @@ def phase1_runs() -> dict[tuple[str, int], list[dict]]:
     return out
 
 
-# --------------------------- Day-5 BIWM loader ------------------------------
 def day5_biwm_a_runs() -> dict[str, list[dict]]:
     out: dict[str, list[dict]] = defaultdict(list)
     for wrapper, base_h in WRAPPERS:
@@ -189,9 +151,7 @@ def day5_biwm_full_runs() -> dict[str, list[dict]]:
     return out
 
 
-# ------------------------------- G2 loader ---------------------------------
 def g2_runs() -> dict[tuple[str, int], list[dict]]:
-    """Group features by (harness, K) for G2 base runs. 10 task × 1 seed = 10."""
     out: dict[tuple[str, int], list[dict]] = defaultdict(list)
     for h, t, K in itertools.product(HARNESSES, G2_TASKS, G2_KS):
         p = G2_DIR / f"BASE_{h}_{t}_K{K}_seed42.jsonl"
@@ -226,7 +186,6 @@ def g2_biwm_full_runs() -> dict[str, list[dict]]:
     return out
 
 
-# ------------------------------ stats helpers ------------------------------
 def _safe_ece(preds, labels, n_bins=15) -> float:
     if not preds:
         return float("nan")
@@ -278,7 +237,6 @@ def compute_metrics(features: list[dict], n_bins: int = 15) -> dict:
     }
 
 
-# ------------------------------ markdown renderers ------------------------
 def short(h: str) -> str:
     return h.split("_")[0]
 
@@ -611,16 +569,6 @@ def render_auroc(label: str, kind: str, prob_field: str, outcome_field: str,
 
 
 def pooled_repair_auroc(p1: dict, day5_full: dict) -> dict:
-    """Pooled Repair AUROC — needed because per-cell outcomes are single-class
-    (H0/H1/H2/H4/H5 produce 0% repair events at K=5; H3 produces 100% —
-    deterministic harness behavior, see g4_table §3 caveat). Pooling restores
-    class balance so the indicator is computable.
-
-    Returns:
-      'global': pool all 6 harnesses K=5 (Naive) vs all 5 BIWM-full
-      'per_base': for each base harness, pool (H0_raw + base) K=5 (Naive)
-                  vs (BIWM-full(base) + H0_raw K=5) (BIWM)
-    """
     out = {"global": {}, "per_base": {}}
     pred_n, lab_n = [], []
     for (h, K), runs in p1.items():
@@ -663,7 +611,6 @@ def pooled_repair_auroc(p1: dict, day5_full: dict) -> dict:
 
 def render_combined(p1, day5_a, day5_full, g2, g2_a, g2_full, out_path: Path,
                     pool_rep: dict | None = None):
-    """Single-page G4 paper-ready summary table."""
     md = []
     md.append("# G4 — calibration + failure / repair AUROC (paper-ready)\n\n")
     md.append("| Field | Value |\n| --- | --- |\n")
@@ -811,7 +758,6 @@ def render_combined(p1, day5_a, day5_full, g2, g2_a, g2_full, out_path: Path,
     out_path.write_text("".join(md))
 
 
-# -------------------------------- main -------------------------------------
 def main() -> int:
     print("[load] Phase-1 main table (576 runs)")
     p1 = phase1_runs()
@@ -838,7 +784,6 @@ def main() -> int:
     print("[pool] Repair AUROC pooled (per-cell single-class, see g4_table §1b)")
     pool_rep = pooled_repair_auroc(p1, day5_full)
 
-    # --- raw json dump ---
     raw = {
         "metric_version": "v1.1 G4 self-consistency",
         "outcome_defs": {
@@ -877,7 +822,6 @@ def main() -> int:
                     OUT_DIR / "g4_table_descriptive.md",
                     pool_rep=pool_rep)
 
-    # Print headline summary line
     print(json.dumps({
         "wrote": [
             "g4_ece_descriptive.md",

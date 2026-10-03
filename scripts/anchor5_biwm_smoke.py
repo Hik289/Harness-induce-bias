@@ -1,31 +1,3 @@
-"""anchor_5: BIWM 描述性 smoke (Director 02:30 UTC 决策 — 只做描述, 不做统计).
-
-设计:
-3 类对比 (每类只跑 smoke 子集, 不重跑全 Phase 1 主表):
-
-Group A: 单组件 wrapper (BIWM-1, 2, 3, 4, 5) 套在最相关 base harness 上
-  - H0 vs H1: 加 BIWM-1 (canonical) → 看 D 是否下降 (canonicalization 应当
-    把 H0 raw 和 H1 structured 的差异拉平)
-  - H0 vs H2: 加 BIWM-2 (blocked_log) → 看 D / failure_mode_mismatch 是否
-    下降 (告诉 LLM 哪些 branch 被 censor)
-  - H0 vs H3: 加 BIWM-3 (repair_unrolled) → 看 D 是否变化 (Phase 1 看到 H3
-    长程上反而趋同 H0, BIWM-3 加 explicit fail+repair 应当让 H3 LLM 恢复
-    risk_aware → D 可能反而**变大**)
-  - H0 vs H4: 加 BIWM-4 (verification_mask) → 看 D 是否下降
-  - H0 vs H5: 加 BIWM-5 (shadow) → 看 D 是否下降 (shadow 在 H5 cost-aware 上
-    本身 trigger 少, 这里主要 sanity test 不 crash)
-
-Group B: BIWM-full 套在所有 5 个非-H0 harness 上, 看 vs H0 是否整体收敛
-  - 选 toy_007 (有 risky_actions 触发 BIWM-2/5) + toy_004 (numeric stress)
-  - K=5, seed=42 (单 seed, smoke)
-
-Group C: BIWM-6/7 cross-harness alignment (post-hoc reducer)
-  - 直接读 Phase 1 主表的 576 jsonl, 对每个 (task, K, seed) 取 6 harness 的
-    belief_K, 调 align_beliefs(.) 得 aligned belief, 再算 D(H0, aligned)
-  - 报"D 是否比 D(H0, H_x) 平均更低" → BIWM-6 是否减少 belief divergence
-
-所有结果**只做描述性**: 不算 p 值, 只报 D 均值变化 + 5 分量分别变化方向.
-"""
 from __future__ import annotations
 
 import argparse
@@ -43,12 +15,12 @@ for _p in (str(_EXPERIMENTS.parent), str(_SKELETON), str(_EXPERIMENTS)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from skeleton.benchmark.hibench_loader import load_tasks  # noqa: E402
-from skeleton.core.jsonl_logger import JSONLLogger  # noqa: E402
-from skeleton.core.llm_client import LLMClient  # noqa: E402
-from skeleton.core.rollout import run_kstep_rollout  # noqa: E402
-from skeleton.harnesses import HARNESS_REGISTRY  # noqa: E402
-from skeleton.biwm import (  # noqa: E402
+from skeleton.benchmark.hibench_loader import load_tasks
+from skeleton.core.jsonl_logger import JSONLLogger
+from skeleton.core.llm_client import LLMClient
+from skeleton.core.rollout import run_kstep_rollout
+from skeleton.harnesses import HARNESS_REGISTRY
+from skeleton.biwm import (
     CanonicalBeliefWrapper,
     BlockedActionLogWrapper,
     RepairUnrolledWrapper,
@@ -58,7 +30,7 @@ from skeleton.biwm import (  # noqa: E402
     align_beliefs,
     self_consistency_score,
 )
-from metrics.d_belief import d_belief_components  # noqa: E402
+from metrics.d_belief import d_belief_components
 
 JST = timezone(timedelta(hours=9))
 
@@ -79,7 +51,7 @@ def _read_phase1_belief(phase1_dir: Path, hid: str, tid: str, K: int, seed: int)
         return None
     try:
         return _read_last_belief(p)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
@@ -93,7 +65,6 @@ def main(out_dir: str, phase1_dir: str, seed: int, K: int, tasks_subset: list[st
 
     llm = LLMClient(min_interval_s=0.35, max_retries=3)
 
-    # ----------- Group A: 单组件 wrapper on most-relevant pair -----------
     print("=== Group A: single-component BIWM wrappers ===", flush=True)
     group_a = {
         "BIWM1_canonical_on_H1": ("H0_raw", "H1_structured", CanonicalBeliefWrapper),
@@ -107,13 +78,10 @@ def main(out_dir: str, phase1_dir: str, seed: int, K: int, tasks_subset: list[st
     for label, (h0_id, hx_id, wrapper_cls) in group_a.items():
         per_task: list[dict] = []
         for task in tasks:
-            # baseline H0 from phase1
             b0 = _read_phase1_belief(phase1, h0_id, task["task_id"], K, seed)
-            # baseline Hx from phase1
             bx_base = _read_phase1_belief(phase1, hx_id, task["task_id"], K, seed)
             if b0 is None or bx_base is None:
                 continue
-            # BIWM-wrapped Hx: re-run rollout with wrapper
             wrapped = wrapper_cls(HARNESS_REGISTRY[hx_id]())
             wrapped.harness_id = f"{label}_{hx_id}"
             log_path = out / f"{wrapped.harness_id}_{task['task_id']}_K{K}_seed{seed}.jsonl"
@@ -125,7 +93,7 @@ def main(out_dir: str, phase1_dir: str, seed: int, K: int, tasks_subset: list[st
                     seed=seed,
                 )
                 bx_wrapped = _read_last_belief(log_path)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 print(f"  [CRASH] {label} {task['task_id']}: {e}", flush=True)
                 continue
             d_base = d_belief_components(b0, bx_base)
@@ -163,7 +131,6 @@ def main(out_dir: str, phase1_dir: str, seed: int, K: int, tasks_subset: list[st
             flush=True,
         )
 
-    # ----------- Group B: BIWM-full vs baseline, per non-H0 harness -----------
     print("\n=== Group B: BIWM-full stacking on all 5 non-H0 harnesses ===", flush=True)
     group_b_results = {}
     for hx_id in ("H1_structured", "H2_risk_gated", "H3_repair_heavy",
@@ -184,7 +151,7 @@ def main(out_dir: str, phase1_dir: str, seed: int, K: int, tasks_subset: list[st
                     seed=seed,
                 )
                 bx_full = _read_last_belief(log_path)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 print(f"  [CRASH] BIWMfull {hx_id} {task['task_id']}: {e}", flush=True)
                 continue
             d_base = d_belief_components(b0, bx_base)
@@ -212,7 +179,6 @@ def main(out_dir: str, phase1_dir: str, seed: int, K: int, tasks_subset: list[st
         print(f"  BIWM-full vs H0 on {hx_id:<28s} n={len(per_task)} "
               f"D_base={mb:.3f} → D_full={mf:.3f} Δ={mf-mb:+.3f}", flush=True)
 
-    # ----------- Group C: BIWM-6/7 post-hoc alignment on full Phase 1 data ----
     print("\n=== Group C: BIWM-6/7 cross-harness alignment (post-hoc, reads Phase 1) ===", flush=True)
     all_tasks = load_tasks()
     all_k = [1, 3, 5, 8]
@@ -232,11 +198,9 @@ def main(out_dir: str, phase1_dir: str, seed: int, K: int, tasks_subset: list[st
                 h0 = beliefs_by_h.get("H0_raw")
                 if h0 is None:
                     continue
-                # alignment over the 5 non-H0 harnesses
                 non_h0_views = [v for hid, v in beliefs_by_h.items() if hid != "H0_raw"]
                 aligned = align_beliefs(non_h0_views)
                 consistency = self_consistency_score(non_h0_views)
-                # for descriptive comparison: mean D(H0, Hx) across 5 vs D(H0, aligned)
                 ds_base = [d_belief_components(h0, v)["D_belief"]
                            for v in non_h0_views]
                 d_align = d_belief_components(h0, aligned)["D_belief"]
@@ -253,7 +217,6 @@ def main(out_dir: str, phase1_dir: str, seed: int, K: int, tasks_subset: list[st
         mb_base = statistics.fmean(r["mean_D_baseline_5pair"] for r in align_records)
         mb_align = statistics.fmean(r["D_H0_vs_aligned"] for r in align_records)
         delta_mean = statistics.fmean(r["delta_D_align_minus_base"] for r in align_records)
-        # break down by K
         by_K = {}
         for k in all_k:
             sub = [r for r in align_records if r["K"] == k]

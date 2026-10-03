@@ -1,24 +1,3 @@
-"""day3_step_B audit under D_belief v1.1 decomposition.
-
-Independent verification of ml_engineer SETUP_DAY3_REPORT §3.2 "growth-only D"
-claim that mean ratio K=5/K=1 ≈ 8.65× and 3/5 tasks ≥ 2× for the cat+fail+num
-sub-metric.
-
-Difference from ml_eng's growth-D in SETUP_DAY3_REPORT:
-- ml_eng used a manual re-normalised sum {cat:0.30, fail:0.15, num:0.25}/0.70
-  computed inline in their report.
-- This audit uses the **canonical** v1.1 `d_belief_growth(...)` API from
-  `experiments/metrics/d_belief.py`, with the pinned `DBeliefGrowthWeights`
-  defaults (3/7, 3/14, 5/14). The two should agree to machine epsilon since
-  both re-normalise the same weights — this is the audit point.
-
-Per-task table reports D_scalar, D_arrival, D_growth at K∈{1,5,8} plus all
-ratios. Final statistical block runs paired t / Cohen's d / bootstrap 10k on
-both scalar Δ and growth Δ.
-
-Run:
-    python3 analysis/day3_step_B_growth_audit.py
-"""
 from __future__ import annotations
 
 import json
@@ -34,12 +13,12 @@ EXP = ROOT / "experiments"
 sys.path.insert(0, str(EXP / "skeleton"))
 sys.path.insert(0, str(EXP))
 
-from metrics.d_belief import (  # noqa: E402
+from metrics.d_belief import (
     ARRIVAL_GROUP_WEIGHT, GROWTH_GROUP_WEIGHT,
     d_belief_decomposition,
 )
 
-K1_LOG_DIR = EXP / "logs" / "anchor4_phase1_smoke"  # reused K=1 logs
+K1_LOG_DIR = EXP / "logs" / "anchor4_phase1_smoke"
 KX_LOG_DIR = EXP / "logs" / "day3_step_B"
 SUMMARY = KX_LOG_DIR / "step_B_summary.json"
 
@@ -80,7 +59,7 @@ def paired_t(deltas: list[float]) -> dict[str, float]:
     t = mean / se if se > 0 else float("inf")
     df = n - 1
     try:
-        from scipy.stats import t as student_t  # noqa: WPS433
+        from scipy.stats import t as student_t
         p_two = 2 * (1 - student_t.cdf(abs(t), df))
         p_one = 1 - student_t.cdf(t, df)
     except Exception:
@@ -105,7 +84,6 @@ def bootstrap_ratio(
     num_vals: list[float], den_vals: list[float],
     n_boot: int = 10000, seed: int = 42, alpha: float = 0.05,
 ) -> dict:
-    """Bootstrap CI on the mean(num)/mean(den) ratio, paired resample by index."""
     rng = np.random.default_rng(seed)
     num = np.asarray(num_vals, dtype=float)
     den = np.asarray(den_vals, dtype=float)
@@ -151,7 +129,6 @@ def main() -> int:
     rows = []
     for task in tasks:
         cells = {K: decomp_at_K(task, K) for K in (1, 5, 8)}
-        # consistency: ml_eng summary scalar matches v1.1 recomp
         ml_scalar_K1 = next(t for t in summary["tasks"] if t["task_id"] == task)["D_K1"]
         ml_scalar_K5 = next(t for t in summary["tasks"] if t["task_id"] == task).get("D_K5")
         ml_scalar_K8 = next(t for t in summary["tasks"] if t["task_id"] == task).get("D_K8")
@@ -182,7 +159,6 @@ def main() -> int:
         }
         rows.append(row)
 
-    # ---- aggregate statistics on growth ratios ----
     growth_K1 = [r["growth_K1"] for r in rows]
     growth_K5 = [r["growth_K5"] for r in rows]
     growth_K8 = [r["growth_K8"] for r in rows]
@@ -206,7 +182,6 @@ def main() -> int:
     n_amplified_K5_growth = sum(1 for r in rows if r["growth_ratio_K5_K1"] >= 2.0)
     n_amplified_K8_growth = sum(1 for r in rows if r["growth_ratio_K8_K1"] >= 2.0)
 
-    # Use ml_eng's aggregation (mean_of_ratios) for the verification check
     mean_growth_ratio_K5 = mean_of_ratios_K5
     mean_growth_ratio_K8 = mean_of_ratios_K8
 
@@ -377,7 +352,6 @@ def write_md(out, rows, summary):
                   f"{r['arrival_K1']:.3f} | {r['arrival_K5']:.3f} | {r['arrival_K8']:.3f} | "
                   f"{r['growth_K1']:.3f} | {r['growth_K5']:.3f} | {r['growth_K8']:.3f} | "
                   f"{rk5} | {rk8} |\n")
-    # mean row
     def m(k):
         return statistics.fmean([r[k] for r in rows])
     md.append(f"| **mean** | **{m('scalar_K1'):.3f}** | **{m('scalar_K5'):.3f}** | **{m('scalar_K8'):.3f}** | "

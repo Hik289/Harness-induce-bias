@@ -1,17 +1,3 @@
-"""Step B (DAY3): K-放大 fail-fast.
-
-同 anchor_4 的 5 toy task (toy_001..005), H0 vs H2 paired, 把 K 从 {1,3} 扩到
-**K=5 和 K=8**, 测 D_belief(K=5)/D_belief(K=1) 的比值是否 >= 2.0 (G1 弱版).
-
-Director PASS 阈值 (与 anchor_4 strict 5/5 同形, 但允许 4/5 + 平均比值):
-- per-task: D(K=5)/D(K=1) >= 2.0  → "K=5 放大"
-- per-task: D(K=8)/D(K=1) >= 2.0  → "K=8 放大"
-- PASS = (>=4/5 task K=5 放大 AND >=4/5 task K=8 放大 AND mean(K=5/K=1)>=2.0 AND mean(K=8/K=1)>=2.0)
-- 失败任一即立即 push back, 不进 A
-
-我复用 anchor_4 已经跑过的 K=1 数据 (5 task × 2 harness × K=1 jsonl 已在 logs/anchor4_phase1_smoke/),
-新跑 K=5 + K=8, 节省一半 LLM call。
-"""
 from __future__ import annotations
 
 import argparse
@@ -28,12 +14,12 @@ for _p in (str(_EXPERIMENTS.parent), str(_SKELETON), str(_EXPERIMENTS)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from skeleton.benchmark.hibench_loader import load_tasks  # noqa: E402
-from skeleton.core.jsonl_logger import JSONLLogger  # noqa: E402
-from skeleton.core.llm_client import LLMClient  # noqa: E402
-from skeleton.core.rollout import run_kstep_rollout  # noqa: E402
-from skeleton.harnesses import H0RawHarness, H2RiskGatedHarness  # noqa: E402
-from metrics.d_belief import d_belief_components  # noqa: E402
+from skeleton.benchmark.hibench_loader import load_tasks
+from skeleton.core.jsonl_logger import JSONLLogger
+from skeleton.core.llm_client import LLMClient
+from skeleton.core.rollout import run_kstep_rollout
+from skeleton.harnesses import H0RawHarness, H2RiskGatedHarness
+from metrics.d_belief import d_belief_components
 
 JST = timezone(timedelta(hours=9))
 TASK_PREFIX = ["toy_001", "toy_002", "toy_003", "toy_004", "toy_005"]
@@ -52,7 +38,6 @@ def _read_last_belief(p: Path) -> dict:
 def main(out_dir: str, prior_dir: str | None, seed: int) -> int:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    # Step B 新跑 K=5 + K=8. K=1 复用 prior_dir (anchor_4 已跑过的 K=1 jsonl).
     tasks = [t for t in load_tasks() if any(t["task_id"].startswith(p) for p in TASK_PREFIX)]
     tasks = tasks[:5]
     assert len(tasks) == 5, f"need 5 tasks, got {len(tasks)}"
@@ -68,7 +53,6 @@ def main(out_dir: str, prior_dir: str | None, seed: int) -> int:
         row: dict = {"task_id": task["task_id"]}
         bel: dict[tuple[str, int], dict] = {}
 
-        # K=1 复用 anchor_4 logs
         for hid in harnesses:
             p1 = prior / f"{hid}_{task['task_id']}_K1_seed{seed}.jsonl"
             if not p1.exists():
@@ -78,7 +62,6 @@ def main(out_dir: str, prior_dir: str | None, seed: int) -> int:
                 )
             bel[(hid, 1)] = _read_last_belief(p1)
 
-        # K=5, K=8 新跑
         for K in (5, 8):
             for hid, harness in harnesses.items():
                 log_path = out / f"{hid}_{task['task_id']}_K{K}_seed{seed}.jsonl"
@@ -97,7 +80,6 @@ def main(out_dir: str, prior_dir: str | None, seed: int) -> int:
                 row[f"{hid}_K{K}_tokens"] = summary["total_tokens"]
                 row[f"{hid}_K{K}_latency_s"] = round(summary["total_latency_s"], 2)
 
-        # D_belief at K=1, 5, 8
         D = {
             K: d_belief_components(bel[("H0_raw", K)], bel[("H2_risk_gated", K)])
             for K in (1, 5, 8)

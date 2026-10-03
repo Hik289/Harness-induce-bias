@@ -1,17 +1,3 @@
-"""Day 8 Task 1: K=20 long horizon on HIBench-Code v0_toy.
-
-Goal: 测 D_belief 在 K∈{12, 16, 20} 上是否还在增长还是趋于饱和.
-Phase 1 主表已经覆盖 K∈{1, 3, 5, 8}, 现补 K∈{12, 16, 20}.
-
-Setup:
-- 6 harness × 8 task × {K=12, 16, 20} × 1 seed = 144 new run
-- seed=42 (与 Phase 1 主表 seed=42 那一组对齐, 便于跨 K 拼接)
-- imagined rollout 不变 (Director Day-2 决策)
-
-Output:
-- logs/long_horizon_K20/{harness}_{task}_K{k}_seed42.jsonl (144 files)
-- logs/long_horizon_K20/long_horizon_summary.json (含 per-(harness, K) tokens/lat + 跨 K trajectory)
-"""
 from __future__ import annotations
 
 import argparse
@@ -30,15 +16,15 @@ for _p in (str(_EXPERIMENTS.parent), str(_SKELETON), str(_EXPERIMENTS)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from skeleton.benchmark.hibench_loader import load_tasks  # noqa: E402
-from skeleton.core.jsonl_logger import JSONLLogger  # noqa: E402
-from skeleton.core.llm_client import LLMClient  # noqa: E402
-from skeleton.core.rollout import run_kstep_rollout  # noqa: E402
-from skeleton.harnesses import HARNESS_REGISTRY  # noqa: E402
+from skeleton.benchmark.hibench_loader import load_tasks
+from skeleton.core.jsonl_logger import JSONLLogger
+from skeleton.core.llm_client import LLMClient
+from skeleton.core.rollout import run_kstep_rollout
+from skeleton.harnesses import HARNESS_REGISTRY
 
 JST = timezone(timedelta(hours=9))
 
-K_VALUES_NEW = [12, 16, 20]   # 新跑的 K
+K_VALUES_NEW = [12, 16, 20]
 SEED = 42
 
 
@@ -63,14 +49,11 @@ def main(out_dir: str, n_tasks: int | None = None) -> int:
     total_tokens = 0
     completed = 0
 
-    # task-major, then K asc, then harness. Long-K runs are slow so we want
-    # broad coverage before finishing all 20-step runs.
     for task in tasks:
         for K in K_VALUES_NEW:
             for hid, harness in harnesses.items():
                 log_path = out / f"{hid}_{task['task_id']}_K{K}_seed{SEED}.jsonl"
                 if log_path.exists() and log_path.stat().st_size > 0:
-                    # resume-skip
                     try:
                         with log_path.open("r", encoding="utf-8") as fh:
                             lines = [json.loads(l) for l in fh if l.strip()]
@@ -98,7 +81,7 @@ def main(out_dir: str, n_tasks: int | None = None) -> int:
                             total_tokens += runs[-1]["total_tokens"]
                             completed += 1
                             continue
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         log_path.unlink(missing_ok=True)
 
                 logger = JSONLLogger(log_path)
@@ -115,7 +98,7 @@ def main(out_dir: str, n_tasks: int | None = None) -> int:
                     total_pass += s["schema_pass"]
                     total_fail_schema += s["schema_fail"]
                     total_tokens += s["total_tokens"]
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     crashed.append({
                         "task_id": task["task_id"], "harness_id": hid,
                         "K": K, "error": f"{type(e).__name__}: {e}",
@@ -136,7 +119,6 @@ def main(out_dir: str, n_tasks: int | None = None) -> int:
                         flush=True,
                     )
 
-    # ---- aggregate per-(harness, K) ----
     print("\n=== aggregating ===", flush=True)
     per_hk: dict[tuple[str, int], dict] = {}
     for r in runs:

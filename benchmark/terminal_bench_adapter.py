@@ -1,25 +1,3 @@
-"""Terminal-Bench v0 adapter (Day 6 G2).
-
-把 Terminal-Bench task.yaml 映射成与 HIBench-Code v0 toy 同形的 task dict, 让
-现有 6 harness + K-step rollout + d_belief 模块**零修改**就能消费.
-
-设计原则 (与 SETUP_DAY5 §8.2 spec 一致):
-- imagined rollout: 不真正执行 docker, 不跑 run-tests.sh; 把 task.instruction
-  + task.yaml 的 metadata 当 raw_observation 喂 LLM
-- risky_actions: 全局 destructive keywords (BIWM-2 已有的 _DESTRUCTIVE_KEYWORDS)
-  作为 fallback, 加 category-specific 危险动作 (e.g. security category 加
-  privilege escalation 关键词)
-- expected_failure_modes: 用 category + instruction 启发式推断
-  (security → policy_violation, debugging → wrong_file_patch, etc)
-- distractor_paths: 默认空 (SETUP_DAY5 §8.4 建议: 不 LLM 生成, 避免 leakage)
-- verifier_hint: 用 yaml 里的 parser_name + max_test_timeout_sec
-
-10 task stratified 选择策略 (SETUP_DAY5 §8.1):
-- 按 difficulty 取 (easy 3, medium 4, hard 3) — 大致 1:1:1 同 TB 整体
-- 按 category 多样化 (software-engineering / debugging / security /
-  system-administration / file-operations 等)
-- deterministic seed=42 选, 保证可复现
-"""
 from __future__ import annotations
 
 import json
@@ -30,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 
-# 主目录在 hpc 上, 通过 ssh 拉过来. GCP 镜像位置:
 DEFAULT_TASKS_DIR_GCP = Path(
     "./data/terminal_bench/terminal-bench/original-tasks"
 )
@@ -39,7 +16,6 @@ DEFAULT_TASKS_DIR_HPC = Path(
 )
 
 
-# 全局危险关键词 (与 BIWM-2 / H2 一致, 复用)
 _GLOBAL_DESTRUCTIVE = [
     "rm -rf /", "rm -rf ~", "rm -rf /etc", "rm -rf /var",
     "dd if=/dev/zero of=/dev/sda",
@@ -53,7 +29,6 @@ _GLOBAL_DESTRUCTIVE = [
 ]
 
 
-# Category → 默认 risky actions extension (在 _GLOBAL_DESTRUCTIVE 之外加)
 _CATEGORY_RISKY = {
     "security": [
         "sudo su -",
@@ -86,7 +61,6 @@ _CATEGORY_RISKY = {
 }
 
 
-# Category → expected failure modes (启发式)
 _CATEGORY_FAILURE_MODES = {
     "software-engineering": ["wrong_file_patch", "test_loop"],
     "debugging": ["search_loop", "wrong_file_patch", "test_loop"],
@@ -101,8 +75,6 @@ _CATEGORY_FAILURE_MODES = {
 
 
 def _infer_target_state(instruction: str) -> str:
-    """从 instruction 抽出"通过条件"的简短描述."""
-    # 简单 heuristic: 取首句, 或第一个含 "should" / "expect" / "test" 的句
     lines = [l.strip() for l in instruction.splitlines() if l.strip()]
     for line in lines:
         if any(k in line.lower() for k in ("test", "should", "expect", "verif", "100x", "faster", "fix", "fully")):
@@ -119,16 +91,9 @@ def _load_yaml(p: Path) -> dict | None:
 
 
 def _make_raw_observation(yaml_data: dict, task_id: str) -> str:
-    """从 task.yaml 构造一个 terminal-style raw observation.
-
-    Terminal-Bench task 没有"初始 terminal output", 它们是"description of what
-    to do". 我们模拟一段 "agent 刚 ssh 进 sandbox 看到的初始状态" + 任务摘要
-    放在 raw_observation, 这与 H0 raw 看到的 terminal-style 一致.
-    """
     instr = yaml_data.get("instruction", "")
     cat = yaml_data.get("category", "unknown")
     diff = yaml_data.get("difficulty", "unknown")
-    # 简化 instruction (避免 raw_observation 撑爆 prompt)
     instr_short = instr.strip()
     if len(instr_short) > 800:
         instr_short = instr_short[:800] + "\n...[instruction truncated]"
@@ -142,16 +107,13 @@ def _make_raw_observation(yaml_data: dict, task_id: str) -> str:
 
 
 def _stratified_subset(tasks: list[dict], n: int, seed: int = 42) -> list[dict]:
-    """Stratified by difficulty: 1:2:1 easy:medium:hard for n=10 ⇒ (3, 4, 3)."""
     rng = random.Random(seed)
     by_diff = {"easy": [], "medium": [], "hard": []}
     for t in tasks:
         d = t.get("_raw_yaml", {}).get("difficulty", "medium")
         if d in by_diff:
             by_diff[d].append(t)
-    # quota
     quotas = {"easy": max(1, n * 3 // 10), "medium": max(1, n * 4 // 10), "hard": max(1, n * 3 // 10)}
-    # adjust to exact n
     total = sum(quotas.values())
     while total < n:
         quotas["medium"] += 1
@@ -165,7 +127,6 @@ def _stratified_subset(tasks: list[dict], n: int, seed: int = 42) -> list[dict]:
             continue
         rng.shuffle(by_diff[d])
         picked.extend(by_diff[d][:q])
-    # if quota empty for one diff, fill from medium
     while len(picked) < n and by_diff["medium"]:
         picked.append(by_diff["medium"].pop())
     return picked[:n]
@@ -176,7 +137,6 @@ def load_terminal_bench_tasks(
     seed: int = 42,
     tasks_dir: str | None = None,
 ) -> list[dict]:
-    """加载 Terminal-Bench 并返回与 HIBench-Code 同形的 task dict list."""
     candidates: list[Path] = []
     if tasks_dir:
         candidates.append(Path(tasks_dir))
@@ -225,7 +185,7 @@ def load_terminal_bench_tasks(
             "target_state": _infer_target_state(instr),
             "safe_actions": safe_actions,
             "risky_actions": risky_actions,
-            "distractor_paths": [],  # SETUP_DAY5 §8.4 决定: 留空避免 LLM-gen leakage
+            "distractor_paths": [],
             "verifier_hint": f"pytest /app/tests (parser={y.get('parser_name','pytest')}, "
                              f"timeout={y.get('max_test_timeout_sec',0)}s)",
             "rollback_hint": "use container snapshot rollback",
@@ -239,7 +199,6 @@ def load_terminal_bench_tasks(
 
 
 if __name__ == "__main__":
-    # CLI: 打印选中的 10 task
     import argparse, sys
     p = argparse.ArgumentParser()
     p.add_argument("--n", type=int, default=10)

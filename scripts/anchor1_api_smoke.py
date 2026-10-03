@@ -1,8 +1,3 @@
-"""anchor_1: OpenAI-compatible API 50 次调用成功率 >= 95%.
-
-每次调用要求模型返回一个 {n: int, parity: "odd"|"even"} 的合法 JSON, 用于同
-时验证 (a) 链路可用 (b) JSON mode 稳定 (c) rate limit 不被触发。
-"""
 from __future__ import annotations
 
 import argparse
@@ -13,10 +8,9 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# 让脚本能 import sibling 包
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from skeleton.core.llm_client import LLMClient  # noqa: E402
+from skeleton.core.llm_client import LLMClient
 
 
 JST = timezone(timedelta(hours=9))
@@ -65,7 +59,7 @@ def main(n_calls: int, out_path: str) -> int:
             else:
                 failures += 1
                 rec["error"] = "answer mismatch"
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             failures += 1
             rec.update(ok=False, error=f"{type(e).__name__}: {e}")
         results.append(rec)

@@ -1,17 +1,3 @@
-"""BIWM-1: Canonical Belief (readme §11.1).
-
-不同 harness 暴露不同 observation, 但在 belief rollout 前先把"原始 observation"
-通过 LLM 翻译成 canonical 形态: 一个**所有 harness 共享**的固定 schema, 内容
-仅取与 task 状态有关的信息, 剥离 harness 自带的 narrative/policy header/
-budget banner 等"装饰".
-
-实施位置: harness wrapper (覆盖 make_observation 的输出, 不动 harness 原始
-逻辑). 这样所有 harness 进入 rollout 前都先经过同一规范化层。
-
-为了避免每步多花一次 LLM call (canonical 步会让总 token 翻倍), 我们用
-**deterministic rule-based canonicalizer**, 不调 LLM. 这与 readme §11.1 描
-述的 "raw observation -> canonical task belief" 一致, readme 没规定必须 LLM 跑.
-"""
 from __future__ import annotations
 
 import re
@@ -26,7 +12,6 @@ from ..core.harness_base import (
 )
 
 
-# 在 raw_text 前缀里出现的 harness-specific 装饰行模式
 _DECORATION_PATTERNS = (
     r"\[POLICY\][^\n]*",
     r"\[BUDGET=[^\]]+\][^\n]*",
@@ -38,20 +23,18 @@ _DECORATION_PATTERNS = (
     r"⚠️[^\n]*",
     r"⛔[^\n]*",
     r"✅[^\n]*",
-    r"^\s*-\s+\w[^\n]*$",  # bullet items in policy lists
+    r"^\s*-\s+\w[^\n]*$",
 )
 
 
 def _strip_decorations(text: str) -> str:
     for pat in _DECORATION_PATTERNS:
         text = re.sub(pat, "", text, flags=re.MULTILINE)
-    # collapse blank lines
     text = re.sub(r"\n\s*\n+", "\n\n", text).strip()
     return text
 
 
 def _extract_canonical_fields(text: str, task: dict) -> dict[str, Any]:
-    """从 stripped observation 提取一组 canonical 字段, 跨 harness 通用."""
     failing = re.findall(r"(?:File\s+([\w./_-]+),\s*line\s*\d+|([\w/]+\.py))", text)
     files = list({a or b for a, b in failing if (a or b)})[:5]
     excs = list(set(re.findall(r"\b([A-Z][A-Za-z]+(?:Error|Exception))\b", text)))[:5]
@@ -69,12 +52,6 @@ def _extract_canonical_fields(text: str, task: dict) -> dict[str, Any]:
 
 
 class CanonicalBeliefWrapper(Harness):
-    """把任意 harness 包成一个新 harness, 在 make_observation 里做规范化。
-
-    使用:
-        wrapped = CanonicalBeliefWrapper(H2RiskGatedHarness())
-        # rollout 仍然用 wrapped 跑, 但 LLM 看到的 prompt 是 canonical 后的
-    """
 
     def __init__(self, inner: Harness) -> None:
         self.inner = inner

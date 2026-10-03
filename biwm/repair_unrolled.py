@@ -1,12 +1,3 @@
-"""BIWM-3: Repair-Unrolled Logging (readme §11.3).
-
-H3 的 collapsed history 把 "fail → repair → succeed" 压成一步 "succeeded
-(auto-repaired)", LLM 看不到真实失败. BIWM-3 反过来: 把 collapse 的 history
-展开成 explicit 3-step trace, 显式标注哪一步是 fail / repair / recover, 让
-LLM 不会把 repair-masked reliability 当成系统稳定。
-
-只对 repair-heavy 类 harness 起作用; 对其他 harness 退化为 noop.
-"""
 from __future__ import annotations
 
 from typing import Any
@@ -21,10 +12,6 @@ from ..core.harness_base import (
 
 
 def _unroll_history(history: list[dict]) -> list[str]:
-    """把 history 里每一步 (无论 H3 收没收 collapse) 都按 fail→repair→recover
-    格式展开. 因为 imagined rollout 没有真实失败, 我们按 "repair_event.occurred"
-    字段判断哪些步骤其实是 repair-触发的, 把它们 explicit 展开。
-    """
     lines: list[str] = []
     for h in history[-5:]:
         step = h.get("step", 0)
@@ -41,9 +28,6 @@ def _unroll_history(history: list[dict]) -> list[str]:
 
 
 class RepairUnrolledWrapper(Harness):
-    """对 H3 (或任何 repair-heavy harness) 展开 history, 让 LLM 看到 fail+repair
-    分离而非 collapse。
-    """
 
     def __init__(self, inner: Harness) -> None:
         self.inner = inner

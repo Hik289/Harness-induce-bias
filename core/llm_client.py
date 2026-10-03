@@ -1,12 +1,3 @@
-"""OpenAI-compatible chat-completions API wrapper.
-
-设计原则:
-- API key 通过环境变量 OPENAI_API_KEY 注入 (绝不写到 agent 配置或日志)
-- 提供 retry + exponential backoff (per readme §Risks 段)
-- 提供 strict-JSON 输出模式: 调用方传 schema, client 负责重试 + 校验
-- 计费/调用元数据 (latency, tokens, cost) 由 client 写回, 上游统一记录
-- rate limit: 默认 sleep 0.3s between calls (低于 spec 的 1 req/s 上限)
-"""
 from __future__ import annotations
 
 import json
@@ -19,14 +10,12 @@ from typing import Any, Optional
 from openai import OpenAI, APIError, APIConnectionError, RateLimitError
 
 
-# Defaults are provider-agnostic and can be overridden with environment variables.
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-5.4-mini"
 
 
 @dataclass
 class CallStats:
-    """单次 LLM 调用的元数据 (供 logger 写到 JSONL)."""
 
     latency_s: float = 0.0
     prompt_tokens: int = 0
@@ -38,7 +27,6 @@ class CallStats:
 
 
 class LLMClient:
-    """瘦封装。所有 belief rollout / harness 调用都过这一层。"""
 
     def __init__(
         self,
@@ -67,18 +55,15 @@ class LLMClient:
         self._min_interval = min_interval_s
         self._max_retries = max_retries
         self._last_call_ts: float = 0.0
-        # 简单计数, 供 anchor_1 50-call 测试用
         self.total_calls = 0
         self.total_failures = 0
 
-    # --------------------------------------------------------- private
     def _respect_rate_limit(self) -> None:
         delta = time.time() - self._last_call_ts
         if delta < self._min_interval:
             time.sleep(self._min_interval - delta)
         self._last_call_ts = time.time()
 
-    # ---------------------------------------------------------- public
     def chat(
         self,
         messages: list[dict[str, str]],
@@ -88,12 +73,6 @@ class LLMClient:
         response_format_json: bool = False,
         seed: Optional[int] = None,
     ) -> tuple[str, CallStats]:
-        """返回 (content, stats). 自动 retry + backoff.
-
-        `seed`: 通过 chat.completions `seed` 参数传给 API. Some providers/models may
-        not enforce determinism, but the seed still changes the request body and keeps
-        Phase 1's three-seed design explicit.
-        """
         stats = CallStats()
         last_err: Optional[Exception] = None
 
@@ -133,7 +112,7 @@ class LLMClient:
                     break
                 backoff = (2**attempt) + random.uniform(0, 0.5)
                 time.sleep(backoff)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 last_err = e
                 stats.error = f"{type(e).__name__}: {e}"
                 break
@@ -150,7 +129,6 @@ class LLMClient:
         temperature: Optional[float] = None,
         seed: Optional[int] = None,
     ) -> tuple[dict, CallStats]:
-        """要求模型返回严格 JSON. 解析失败会自动 retry 1 次."""
         content, stats = self.chat(
             messages,
             max_tokens=max_tokens,

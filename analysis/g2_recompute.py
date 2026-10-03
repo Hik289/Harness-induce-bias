@@ -1,26 +1,3 @@
-"""G2 (Terminal-Bench) recompute — v1.1 decomposition + cross-benchmark merge.
-
-Produces three Day-7 deliverables:
-
-  analysis/g2_table_descriptive.md       — paper §6 G2 main table (D / D_A / D_G)
-  analysis/biwm_table2_g2_descriptive.md — paper §11 BIWM Table 2 with G2 column
-  analysis/horizon_plot_data.csv         — paper §11.6 main figure data
-  analysis/horizon_plot_data.md          — accompanying notes for viz_expert
-  analysis/g2_v2_raw.json                — machine-readable consolidated dump
-
-Inputs:
-  - experiments/logs/g2_terminal_bench/*.jsonl (220 files, 10 task × 6 har × 2 K
-    BASE + 5 wrappers + 5 full × 10 task × K=5 = 220)
-  - experiments/logs/g2_terminal_bench/g2_terminal_bench_summary.json (ml_eng)
-  - experiments/logs/phase1_main/  (Phase-1 HIBench for cross-benchmark merge)
-  - analysis/biwm_v2_raw.json  (Phase-1 BIWM results)
-
-Discipline: descriptive only (no p-values, no Bonferroni, no CI, no Cohen's d).
-Deterministic; no LLM call; no RNG.
-
-Run:
-    python3 analysis/g2_recompute.py
-"""
 from __future__ import annotations
 
 import csv
@@ -37,11 +14,11 @@ EXP = ROOT / "experiments"
 sys.path.insert(0, str(EXP / "skeleton"))
 sys.path.insert(0, str(EXP))
 
-from metrics.d_belief import (  # noqa: E402
+from metrics.d_belief import (
     ARRIVAL_GROUP_WEIGHT, GROWTH_GROUP_WEIGHT,
     d_belief_decomposition,
 )
-from core.belief_schema import validate_belief  # noqa: E402
+from core.belief_schema import validate_belief
 
 _align_spec = _ilu.spec_from_file_location(
     "_cha", str(EXP / "skeleton" / "biwm" / "cross_harness_align.py")
@@ -82,7 +59,6 @@ FULL_HARNESSES = [
     ("BIWMfull_on_H5_cost_aware", "H5_cost_aware"),
 ]
 
-# Phase-1 (HIBench) constants for cross-benchmark merge
 H1_TASKS = [
     "toy_001_off_by_one", "toy_002_null_check", "toy_003_dict_key_error",
     "toy_004_integer_overflow", "toy_005_regex_anchor",
@@ -93,14 +69,7 @@ H1_KS = [1, 3, 5, 8]
 H1_SEEDS = [42, 43, 44]
 
 
-# ----------------------------------------------------------- IO helpers ----
 def load_final_belief(path: Path) -> dict | None:
-    """Load the final-step belief, trusting canonical schema over writer flag.
-
-    Same policy as biwm_v2_recompute.py — drop on llm_error, validate via
-    canonical METRICS_SPEC §2 schema, include records flagged schema_fail by
-    the writer if they pass the canonical schema.
-    """
     if not path.exists():
         return None
     text = path.read_text()
@@ -138,11 +107,7 @@ def phase1_path(harness: str, task: str, K: int, seed: int) -> Path:
     return PHASE1_DIR / f"{harness}_{task}_K{K}_seed{seed}.jsonl"
 
 
-# ================================== G2 ====================================
 def g2_table1() -> dict:
-    """For G2 (n=10 task × 1 seed = n=10 per cell), compute D/D_A/D_G for
-    H0 vs Hx at K∈{1,5}.
-    """
     out = {}
     for hx in NON_H0:
         for K in G2_KS:
@@ -173,16 +138,10 @@ def g2_table1() -> dict:
 
 
 def g2_per_harness_per_K() -> dict:
-    """For paper §6 'per (harness, K) D / D_A / D_G mean' table.
-
-    Per-harness measurement against H0_raw at K. Same as table1 but indexed
-    differently for the §6 format.
-    """
     return {(hx, K): g2_table1().get((hx, K)) for hx in NON_H0 for K in G2_KS}
 
 
 def g2_biwm_groupA() -> dict:
-    """G2 Group A: BIWM wrappers Δ on Terminal-Bench at K=5, n=10."""
     out = {}
     for wrapper, base_h in WRAPPERS:
         rows_base, rows_biwm, deltas = [], [], defaultdict(list)
@@ -228,7 +187,6 @@ def g2_biwm_groupA() -> dict:
 
 
 def g2_biwm_groupB() -> dict:
-    """G2 Group B: BIWM-full Δ on Terminal-Bench at K=5, n=10."""
     out = {}
     for full_h, base_h in FULL_HARNESSES:
         rows_base, rows_biwm, deltas = [], [], defaultdict(list)
@@ -274,11 +232,6 @@ def g2_biwm_groupB() -> dict:
 
 
 def g2_groupC() -> dict:
-    """G2 cross-harness alignment (BIWM-6), post-hoc on G2 base jsonls.
-
-    Same reducer as Phase-1: align 5 non-H0 belief views, compare against H0.
-    n = 10 per K.
-    """
     per_K = {K: {"mean_D_belief_Hx": [], "mean_D_arrival_Hx": [],
                  "mean_D_growth_Hx": [], "D_belief_aligned": [],
                  "D_arrival_aligned": [], "D_growth_aligned": [],
@@ -326,9 +279,7 @@ def g2_groupC() -> dict:
     return summary
 
 
-# ================ Phase-1 (HIBench) numbers for cross-benchmark merge =====
 def phase1_naive_per_K() -> dict:
-    """Phase-1 HIBench Naive (H0 vs Hx) means at K∈{1,3,5,8}, n=24."""
     out = {}
     for hx in NON_H0:
         for K in H1_KS:
@@ -351,7 +302,6 @@ def phase1_naive_per_K() -> dict:
 
 
 def phase1_groupC() -> dict:
-    """Phase-1 HIBench cross-harness alignment per K, n=24 per K."""
     per_K = {K: {"mean_D_belief_Hx": [], "mean_D_arrival_Hx": [],
                  "mean_D_growth_Hx": [], "D_belief_aligned": [],
                  "D_arrival_aligned": [], "D_growth_aligned": [],
@@ -398,7 +348,6 @@ def phase1_groupC() -> dict:
     return summary
 
 
-# ================================ markdown renderers ======================
 def short_h(h: str) -> str:
     return h.split("_")[0]
 
@@ -486,7 +435,6 @@ def render_g2_table(g2: dict, g2_C: dict, out_path: Path):
 
 
 def render_biwm_table2_g2(g2_A, g2_B, p1_raw, g2_C, p1_C, out_path: Path):
-    """Cross-benchmark BIWM Table 2: HIBench (Phase-1) + Terminal-Bench (G2) side-by-side."""
     md = []
     md.append("# Paper Table 2 — BIWM v1.1 cross-benchmark (HIBench + Terminal-Bench)\n\n")
     md.append("| Field | Value |\n| --- | --- |\n")
@@ -512,7 +460,6 @@ def render_biwm_table2_g2(g2_A, g2_B, p1_raw, g2_C, p1_C, out_path: Path):
         FULL_HARNESSES,
     ):
         sb = short_h(base_h)
-        # Naive
         n_p1_d = p1_A[wrap]["D_belief_baseline_mean"]
         n_p1_g = p1_A[wrap]["D_growth_baseline_mean"]
         n_g2_d = g2_A[wrap]["D_belief_baseline_mean"]
@@ -520,7 +467,6 @@ def render_biwm_table2_g2(g2_A, g2_B, p1_raw, g2_C, p1_C, out_path: Path):
         md.append(f"| {sb} | Naive (H0 vs {sb}, K=5) | "
                   f"{n_p1_d:.3f} | {n_p1_g:.3f} | "
                   f"{n_g2_d:.3f} | {n_g2_g:.3f} |\n")
-        # BIWM-single (the matching wrapper-on-base)
         bs_p1_d = p1_A[wrap]["D_belief_biwm_mean"]
         bs_p1_g = p1_A[wrap]["D_growth_biwm_mean"]
         bs_g2_d = g2_A[wrap]["D_belief_biwm_mean"]
@@ -528,7 +474,6 @@ def render_biwm_table2_g2(g2_A, g2_B, p1_raw, g2_C, p1_C, out_path: Path):
         md.append(f"| {sb} | {wrap.split('_on_')[0]} on {sb} | "
                   f"{bs_p1_d:.3f} | {bs_p1_g:.3f} | "
                   f"{bs_g2_d:.3f} | {bs_g2_g:.3f} |\n")
-        # BIWM-full
         bf_p1_d = p1_B[full_h_p1]["D_belief_biwm_mean"]
         bf_p1_g = p1_B[full_h_p1]["D_growth_biwm_mean"]
         bf_g2_d = g2_B[full_h_g2]["D_belief_biwm_mean"]
@@ -627,12 +572,10 @@ def render_biwm_table2_g2(g2_A, g2_B, p1_raw, g2_C, p1_C, out_path: Path):
 
 
 def render_horizon_plot(p1_C: dict, g2_C: dict, out_dir: Path):
-    """CSV + accompanying note for the paper §11.6 main figure."""
     csv_path = out_dir / "horizon_plot_data.csv"
     md_path = out_dir / "horizon_plot_data.md"
 
     rows = []
-    # HIBench
     for K, c in p1_C.items():
         if c.get("n", 0) == 0:
             continue
@@ -649,7 +592,6 @@ def render_horizon_plot(p1_C: dict, g2_C: dict, out_dir: Path):
             "gap_D_growth": round(c["gap_D_growth"], 6),
             "disagreement_mean": round(c["disagreement_mean"], 6),
         })
-    # Terminal-Bench
     for K in G2_KS:
         c = g2_C["per_K"][K]
         if c.get("n", 0) == 0:
@@ -756,7 +698,6 @@ def render_horizon_plot(p1_C: dict, g2_C: dict, out_dir: Path):
     md_path.write_text("".join(md))
 
 
-# ================================ main ====================================
 def main() -> int:
     print("[g2] base-pair decomposition (5 pair × 2 K × 10 task)")
     g2_t = g2_table1()
